@@ -1,0 +1,13 @@
+export type ErrorCode = "VALIDATION" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "STORAGE" | "CONFIGURATION";
+export type AppError = { code: ErrorCode; message: string; meta?: Record<string, unknown> };
+export type Result<T, E = AppError> = { ok: true; data: T } | { ok: false; error: E };
+export type Domain = "crm" | "finance" | "inventory" | "hr" | "projects";
+export type Role = "ADMIN" | "MANAGER" | "VIEWER";
+export type SessionContext = { workspaceId: string; workspaceName: string; userId: string; name: string; email: string; role: Role; demo: boolean };
+export type DocumentRecord = { id: string; workspaceId: string; domain: Domain; version: number; createdAt: string; updatedAt: string; data: RecordData };
+export type RecordData = { title: string; subtitle: string; status: string; amount: number; quantity: number; email: string; date: string; progress: number; notes: string };
+export type AuditEvent = { id: string; workspaceId: string; actor: string; domain: Domain; action: "created" | "updated" | "deleted" | "payment"; title: string; createdAt: string };
+export type Payment = { id: string; documentId: string; workspaceId: string; amount: number; createdAt: string; reference: string };
+export type WorkspaceState = { documents: DocumentRecord[]; events: AuditEvent[]; payments: Payment[] };
+export type FieldDefinition = { key: keyof RecordData; label: string; type: "text" | "email" | "money" | "number" | "date" | "textarea" | "select"; required?: boolean; options?: readonly string[] };
+export type DomainDefinition = { title: string; singular: string; description: string; primaryLabel: string; secondaryLabel: string; amountLabel: string; statuses: readonly string[]; fields: readonly FieldDefinition[]; board: boolean };

@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  VIEWER
+}
+
+model Workspace {
+  id          String       @id @default(cuid())
+  name        String
+  createdAt   DateTime     @default(now())
+  memberships Membership[]
+  documents   Document[]
+  events      AuditEvent[]
+  payments    Payment[]
+}
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  name         String
+  passwordHash String
+  memberships  Membership[]
+  sessions     Session[]
+}
+
+model Membership {
+  userId      String
+  workspaceId String
+  role        Role      @default(VIEWER)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@id([userId, workspaceId])
+  @@index([workspaceId])
+}
+
+model Session {
+  tokenHash   String   @id
+  userId      String
+  workspaceId String
+  expiresAt   DateTime
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// DocType pattern: module schemas validate the typed JSON payload at every boundary.
+model Document {
+  id          String    @id @default(cuid())
+  workspaceId String
+  domain      String
+  version     Int       @default(1)
+  data        Json
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  payments    Payment[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, domain, createdAt])
+}
+
+model AuditEvent {
+  id          String    @id @default(cuid())
+  workspaceId String
+  actor       String
+  domain      String
+  action      String
+  title       String
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+}
+
+model Payment {
+  id          String    @id @default(cuid())
+  documentId  String
+  workspaceId String
+  amount      Int
+  reference   String
+  createdAt   DateTime  @default(now())
+  document    Document  @relation(fields: [documentId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+
+  @@unique([workspaceId, reference])
+  @@index([workspaceId, documentId])
+}
