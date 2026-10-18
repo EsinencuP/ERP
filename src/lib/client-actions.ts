@@ -1,0 +1,15 @@
+import * as crm from "@/modules/crm/actions";
+import * as finance from "@/modules/finance/actions";
+import * as inventory from "@/modules/inventory/actions";
+import * as hr from "@/modules/hr/actions";
+import * as projects from "@/modules/projects/actions";
+import type { DocumentRecord, Domain, Result } from "@/types/shared";
+
+type ModuleActions = { create: (input: unknown) => Promise<Result<DocumentRecord>>; update: (id: string, version: number, input: unknown) => Promise<Result<DocumentRecord>>; delete: (id: string, version: number) => Promise<Result<DocumentRecord>> };
+export const actions: Record<Domain, ModuleActions> = {
+  crm: { create: crm.createDeal, update: crm.updateDeal, delete: crm.deleteDeal },
+  finance: { create: finance.createInvoice, update: finance.updateInvoice, delete: finance.deleteInvoice },
+  inventory: { create: inventory.createProduct, update: inventory.updateProduct, delete: inventory.deleteProduct },
+  hr: { create: hr.createEmployee, update: hr.updateEmployee, delete: hr.deleteEmployee },
+  projects: { create: projects.createProject, update: projects.updateProject, delete: projects.deleteProject },
+};

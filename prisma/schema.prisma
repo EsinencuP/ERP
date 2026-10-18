@@ -7,83 +7,599 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
+// The existing PostgreSQL enum name is retained to preserve membership data.
+enum UserRole {
+  SUPER_ADMIN
   ADMIN
   MANAGER
-  VIEWER
+  AGENT
+  READONLY
+
+  @@map("Role")
+}
+
+enum ContactStage {
+  LEAD
+  PROSPECT
+  CUSTOMER
+  INACTIVE
+}
+
+enum DealStage {
+  NEW
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  NOTE
+  TASK
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  BANK_TRANSFER
+  CARD
+  CASH
+  OTHER
+}
+
+enum MovementType {
+  IN
+  OUT
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  UNPAID
+  PARENTAL
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  REVIEW
+  DONE
+  CANCELLED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
 }
 
 model Workspace {
-  id          String       @id @default(cuid())
-  name        String
-  createdAt   DateTime     @default(now())
-  memberships Membership[]
-  documents   Document[]
-  events      AuditEvent[]
-  payments    Payment[]
+  id               String            @id @default(cuid())
+  name             String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @default(now()) @updatedAt
+  memberships      Membership[]
+  sessions         Session[]
+  documents        Document[]
+  auditLogs        AuditLog[]
+  documentPayments DocumentPayment[]
+  contacts         Contact[]
+  deals            Deal[]
+  activities       Activity[]
+  invoices         Invoice[]
+  invoiceItems     InvoiceItem[]
+  payments         Payment[]
+  products         Product[]
+  warehouses       Warehouse[]
+  stockItems       StockItem[]
+  stockMovements   StockMovement[]
+  employees        Employee[]
+  leaves           Leave[]
+  projects         Project[]
+  tasks            Task[]
 }
 
 model User {
   id           String       @id @default(cuid())
   email        String       @unique
   name         String
+  avatar       String?
+  role         UserRole     @default(READONLY)
+  isActive     Boolean      @default(true)
   passwordHash String
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @default(now()) @updatedAt
   memberships  Membership[]
   sessions     Session[]
+
+  @@index([isActive])
 }
 
+// Workspace role is authoritative; User.role is only a global/default role.
 model Membership {
-  userId      String
-  workspaceId String
-  role        Role      @default(VIEWER)
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId             String
+  workspaceId        String
+  role               UserRole        @default(READONLY)
+  isActive           Boolean         @default(true)
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @default(now()) @updatedAt
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace          Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sessions           Session[]
+  auditLogs          AuditLog[]      @relation("AuditActor")
+  ownedContacts      Contact[]       @relation("ContactOwner")
+  ownedDeals         Deal[]          @relation("DealOwner")
+  assignedActivities Activity[]      @relation("ActivityAssignee")
+  createdInvoices    Invoice[]       @relation("InvoiceCreator")
+  receivedPayments   Payment[]       @relation("PaymentReceiver")
+  stockMovements     StockMovement[] @relation("StockMovementCreator")
+  employee           Employee?       @relation("EmployeeMember")
+  approvedLeaves     Leave[]         @relation("LeaveApprover")
+  managedProjects    Project[]       @relation("ProjectManager")
+  assignedTasks      Task[]          @relation("TaskAssignee")
 
   @@id([userId, workspaceId])
   @@index([workspaceId])
+  @@index([workspaceId, isActive, role])
 }
 
 model Session {
-  tokenHash   String   @id
+  tokenHash   String     @id
   userId      String
   workspaceId String
   expiresAt   DateTime
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  membership  Membership @relation(fields: [userId, workspaceId], references: [userId, workspaceId], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
+  @@index([workspaceId, userId])
 }
 
-// DocType pattern: module schemas validate the typed JSON payload at every boundary.
-model Document {
+// Mapped to the existing audit table; no history is dropped or recreated.
+model AuditLog {
+  id          String      @id @default(cuid())
+  workspaceId String
+  actor       String
+  actorId     String?
+  domain      String
+  action      String
+  title       String
+  entityType  String?
+  entityId    String?
+  before      Json?
+  after       Json?
+  requestId   String?
+  createdAt   DateTime    @default(now())
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  actorMember Membership? @relation("AuditActor", fields: [actorId, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, entityType, entityId])
+  @@index([workspaceId, actorId])
+  @@map("AuditEvent")
+}
+
+// CRM. Money uses exact integer kopecks (Decimal(20,0)), never Float.
+model Contact {
+  id          String       @id @default(cuid())
+  workspaceId String
+  name        String
+  company     String?
+  email       String?
+  phone       String?
+  address     String?
+  stage       ContactStage @default(LEAD)
+  ownerId     String?
+  notes       String?
+  version     Int          @default(1)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  owner       Membership?  @relation("ContactOwner", fields: [ownerId, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+  deals       Deal[]
+  activities  Activity[]
+  invoices    Invoice[]
+  projects    Project[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, stage])
+  @@index([workspaceId, email])
+  @@index([workspaceId, ownerId])
+}
+
+model Deal {
+  id                String      @id @default(cuid())
+  workspaceId       String
+  title             String
+  contactId         String
+  ownerId           String?
+  stage             DealStage   @default(NEW)
+  value             Decimal     @default(0) @db.Decimal(20, 0)
+  currency          String      @default("RUB") @db.Char(3)
+  expectedCloseDate DateTime?   @db.Date
+  closedAt          DateTime?   @db.Timestamptz(3)
+  notes             String?
+  version           Int         @default(1)
+  createdAt         DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime    @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace         Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  contact           Contact     @relation(fields: [contactId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  owner             Membership? @relation("DealOwner", fields: [ownerId, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+  activities        Activity[]
+  invoices          Invoice[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, stage])
+  @@index([workspaceId, contactId])
+  @@index([workspaceId, ownerId])
+}
+
+model Activity {
+  id           String       @id @default(cuid())
+  workspaceId  String
+  subject      String
+  type         ActivityType
+  contactId    String?
+  dealId       String?
+  assignedToId String?
+  description  String?
+  dueAt        DateTime?    @db.Timestamptz(3)
+  completedAt  DateTime?    @db.Timestamptz(3)
+  version      Int          @default(1)
+  createdAt    DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  contact      Contact?     @relation(fields: [contactId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  deal         Deal?        @relation(fields: [dealId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  assignedTo   Membership?  @relation("ActivityAssignee", fields: [assignedToId, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, contactId])
+  @@index([workspaceId, dealId])
+  @@index([workspaceId, assignedToId, dueAt])
+}
+
+// Finance. Header taxRate is a percentage applied to the net subtotal.
+model Invoice {
+  id          String        @id @default(cuid())
+  workspaceId String
+  number      String        @db.VarChar(64)
+  contactId   String
+  dealId      String?
+  projectId   String?
+  createdById String?
+  status      InvoiceStatus @default(DRAFT)
+  currency    String        @default("RUB") @db.Char(3)
+  subtotal    Decimal       @db.Decimal(20, 0)
+  taxRate     Decimal       @default(0) @db.Decimal(5, 2)
+  total       Decimal       @db.Decimal(20, 0)
+  issueDate   DateTime      @default(now()) @db.Date
+  dueDate     DateTime      @db.Date
+  notes       String?
+  version     Int           @default(1)
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  contact     Contact       @relation(fields: [contactId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  deal        Deal?         @relation(fields: [dealId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  project     Project?      @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  createdBy   Membership?   @relation("InvoiceCreator", fields: [createdById, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+  items       InvoiceItem[]
+  payments    Payment[]
+
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, number])
+  @@index([workspaceId, status, dueDate])
+  @@index([workspaceId, contactId])
+  @@index([workspaceId, dealId])
+  @@index([workspaceId, projectId])
+  @@index([workspaceId, createdById])
+}
+
+model InvoiceItem {
   id          String    @id @default(cuid())
   workspaceId String
-  domain      String
+  invoiceId   String
+  productId   String?
+  position    Int       @default(0)
+  description String
+  quantity    Decimal   @default(1) @db.Decimal(20, 3)
+  unitPrice   Decimal   @db.Decimal(20, 0)
+  total       Decimal   @db.Decimal(20, 0)
   version     Int       @default(1)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  invoice     Invoice   @relation(fields: [invoiceId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  product     Product?  @relation(fields: [productId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, invoiceId, position])
+  @@index([workspaceId, productId])
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  workspaceId  String
+  invoiceId    String
+  receivedById String?
+  amount       Decimal       @db.Decimal(20, 0)
+  method       PaymentMethod @default(BANK_TRANSFER)
+  reference    String
+  receivedAt   DateTime      @default(now()) @db.Timestamptz(3)
+  notes        String?
+  version      Int           @default(1)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  invoice      Invoice       @relation(fields: [invoiceId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  receivedBy   Membership?   @relation("PaymentReceiver", fields: [receivedById, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, reference])
+  @@index([workspaceId, invoiceId])
+  @@index([workspaceId, receivedAt])
+  @@index([workspaceId, receivedById])
+  @@map("invoice_payments")
+}
+
+// Inventory. One exact stock balance per product and warehouse.
+model Product {
+  id           String        @id @default(cuid())
+  workspaceId  String
+  sku          String        @db.VarChar(64)
+  name         String
+  description  String?
+  unit         String        @default("pcs") @db.VarChar(32)
+  currency     String        @default("RUB") @db.Char(3)
+  costPrice    Decimal       @default(0) @db.Decimal(20, 0)
+  salePrice    Decimal       @default(0) @db.Decimal(20, 0)
+  minStock     Decimal       @default(0) @db.Decimal(20, 3)
+  isActive     Boolean       @default(true)
+  version      Int           @default(1)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  stockItems   StockItem[]
+  invoiceItems InvoiceItem[]
+
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, sku])
+  @@index([workspaceId, isActive, name])
+}
+
+model Warehouse {
+  id          String      @id @default(cuid())
+  workspaceId String
+  code        String      @db.VarChar(32)
+  name        String
+  address     String?
+  isActive    Boolean     @default(true)
+  version     Int         @default(1)
+  createdAt   DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime    @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  stockItems  StockItem[]
+
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, code])
+}
+
+model StockItem {
+  id          String          @id @default(cuid())
+  workspaceId String
+  productId   String
+  warehouseId String
+  qty         Decimal         @default(0) @db.Decimal(20, 3)
+  version     Int             @default(1)
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime        @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  product     Product         @relation(fields: [productId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  warehouse   Warehouse       @relation(fields: [warehouseId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  movements   StockMovement[]
+
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, productId, warehouseId])
+  @@index([workspaceId, warehouseId])
+}
+
+// Transfers are paired TRANSFER_OUT / TRANSFER_IN rows sharing transferId.
+model StockMovement {
+  id          String       @id @default(cuid())
+  workspaceId String
+  stockItemId String
+  createdById String?
+  type        MovementType
+  quantity    Decimal      @db.Decimal(20, 3)
+  qtyBefore   Decimal      @db.Decimal(20, 3)
+  qtyAfter    Decimal      @db.Decimal(20, 3)
+  transferId  String?
+  reference   String?
+  notes       String?
+  version     Int          @default(1)
+  createdAt   DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  stockItem   StockItem    @relation(fields: [stockItemId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  createdBy   Membership?  @relation("StockMovementCreator", fields: [createdById, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, stockItemId, createdAt])
+  @@index([workspaceId, transferId])
+  @@index([workspaceId, createdById])
+}
+
+// HR. An employee record need not be a login account.
+model Employee {
+  id          String         @id @default(cuid())
+  workspaceId String
+  employeeId  String         @db.VarChar(64)
+  userId      String?
+  name        String
+  email       String?
+  phone       String?
+  department  String?
+  position    String?
+  hireDate    DateTime       @db.Date
+  status      EmployeeStatus @default(ACTIVE)
+  managerId   String?
+  version     Int            @default(1)
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime       @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace   Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  member      Membership?    @relation("EmployeeMember", fields: [userId, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+  manager     Employee?      @relation("EmployeeManager", fields: [managerId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  reports     Employee[]     @relation("EmployeeManager")
+  leaves      Leave[]
+
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, employeeId])
+  @@unique([userId, workspaceId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, managerId])
+}
+
+model Leave {
+  id           String      @id @default(cuid())
+  workspaceId  String
+  employeeId   String
+  approvedById String?
+  type         LeaveType
+  status       LeaveStatus @default(PENDING)
+  startDate    DateTime    @db.Date
+  endDate      DateTime    @db.Date
+  days         Decimal     @db.Decimal(6, 2)
+  reason       String?
+  version      Int         @default(1)
+  createdAt    DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime    @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace    Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  employee     Employee    @relation(fields: [employeeId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  approvedBy   Membership? @relation("LeaveApprover", fields: [approvedById, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, employeeId, startDate])
+  @@index([workspaceId, status, startDate])
+  @@index([workspaceId, approvedById])
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  workspaceId String
+  code        String        @db.VarChar(64)
+  name        String
+  description String?
+  contactId   String?
+  managerId   String?
+  status      ProjectStatus @default(PLANNING)
+  budget      Decimal       @default(0) @db.Decimal(20, 0)
+  currency    String        @default("RUB") @db.Char(3)
+  startDate   DateTime?     @db.Date
+  endDate     DateTime?     @db.Date
+  version     Int           @default(1)
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  contact     Contact?      @relation(fields: [contactId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  manager     Membership?   @relation("ProjectManager", fields: [managerId, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+  tasks       Task[]
+  invoices    Invoice[]
+
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, code])
+  @@index([workspaceId, status])
+  @@index([workspaceId, contactId])
+  @@index([workspaceId, managerId])
+}
+
+model Task {
+  id           String      @id @default(cuid())
+  workspaceId  String
+  projectId    String
+  parentId     String?
+  assignedToId String?
+  title        String
+  description  String?
+  status       TaskStatus  @default(TODO)
+  priority     Priority    @default(MEDIUM)
+  position     Int         @default(0)
+  dueAt        DateTime?   @db.Timestamptz(3)
+  completedAt  DateTime?   @db.Timestamptz(3)
+  version      Int         @default(1)
+  createdAt    DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime    @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace    Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  project      Project     @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  parent       Task?       @relation("TaskHierarchy", fields: [parentId, projectId, workspaceId], references: [id, projectId, workspaceId], onDelete: Restrict)
+  children     Task[]      @relation("TaskHierarchy")
+  assignedTo   Membership? @relation("TaskAssignee", fields: [assignedToId, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+
+  @@unique([id, workspaceId])
+  @@unique([id, projectId, workspaceId])
+  @@index([workspaceId, projectId, status, position])
+  @@index([workspaceId, assignedToId, status])
+  @@index([parentId, projectId, workspaceId])
+}
+
+// Compatibility layer for the already running document-based UI.
+model Document {
+  id          String            @id @default(cuid())
+  workspaceId String
+  domain      String
+  version     Int               @default(1)
   data        Json
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  payments    Payment[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  payments    DocumentPayment[]
 
   @@unique([id, workspaceId])
   @@index([workspaceId, domain, createdAt])
 }
 
-model AuditEvent {
-  id          String    @id @default(cuid())
-  workspaceId String
-  actor       String
-  domain      String
-  action      String
-  title       String
-  createdAt   DateTime  @default(now())
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-
-  @@index([workspaceId, createdAt])
-}
-
-model Payment {
+// Retains the old Payment table and integer kopecks without reinterpretation.
+model DocumentPayment {
   id          String    @id @default(cuid())
   documentId  String
   workspaceId String
@@ -95,4 +611,5 @@ model Payment {
 
   @@unique([workspaceId, reference])
   @@index([workspaceId, documentId])
+  @@map("Payment")
 }

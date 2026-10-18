@@ -1,0 +1,159 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* HSL channels: use hsl(var(--color-token)) in components. */
+:root {
+  color-scheme: light;
+  --color-background: 210 40% 98%;
+  --color-surface: 0 0% 100%;
+  --color-sidebar: 214 32% 96%;
+  --color-surface-raised: 214 32% 95%;
+  --color-hover: 214 32% 92%;
+  --color-border: 214 32% 86%;
+  --color-border-strong: 215 25% 72%;
+  --color-foreground: 222 47% 11%;
+  --color-muted: 215 16% 39%;
+  --color-subtle: 215 16% 44%;
+  --color-primary: 262 80% 50%;
+  --color-primary-hover: 262 80% 44%;
+  --color-primary-text: 0 0% 100%;
+  --color-primary-soft: 262 80% 96%;
+  --color-success: 142 70% 28%;
+  --color-success-soft: 142 55% 95%;
+  --color-warning: 32 84% 32%;
+  --color-warning-soft: 40 90% 95%;
+  --color-danger: 0 72% 42%;
+  --color-danger-soft: 0 85% 97%;
+  --color-info: 213 70% 40%;
+  --color-info-soft: 213 80% 96%;
+  --color-overlay: 222 47% 5% / 0.72;
+  --color-grid: 214 32% 92%;
+  --color-shadow: 222 47% 11% / 0.04;
+  --color-glass: 210 40% 98% / 0.94;
+  --color-surface-glass: 0 0% 100% / 0.85;
+  --color-transparent: transparent;
+  --radius: 0.75rem;
+}
+
+.dark {
+  color-scheme: dark;
+  --color-background: 222 47% 7%;
+  --color-surface: 222 35% 10%;
+  --color-sidebar: 222 40% 8%;
+  --color-surface-raised: 222 32% 13%;
+  --color-hover: 217 30% 17%;
+  --color-border: 217 33% 20%;
+  --color-border-strong: 215 25% 30%;
+  --color-foreground: 210 40% 98%;
+  --color-muted: 215 20% 70%;
+  --color-subtle: 215 18% 62%;
+  --color-primary: 262 80% 74%;
+  --color-primary-hover: 262 80% 80%;
+  --color-primary-text: 222 47% 8%;
+  --color-primary-soft: 262 36% 19%;
+  --color-success: 142 55% 70%;
+  --color-success-soft: 142 30% 16%;
+  --color-warning: 40 75% 72%;
+  --color-warning-soft: 32 35% 16%;
+  --color-danger: 0 75% 76%;
+  --color-danger-soft: 0 32% 17%;
+  --color-info: 213 65% 76%;
+  --color-info-soft: 213 30% 18%;
+  --color-overlay: 222 47% 3% / 0.8;
+  --color-grid: 217 33% 18%;
+  --color-shadow: 222 47% 2% / 0.22;
+  --color-glass: 222 47% 7% / 0.94;
+  --color-surface-glass: 222 35% 10% / 0.85;
+  --color-transparent: transparent;
+}
+
+/* Shadcn semantic aliases reuse the ERP palette in both themes. */
+:root, .dark {
+  --color-text: var(--color-foreground);
+  --background: var(--color-background);
+  --foreground: var(--color-foreground);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-foreground);
+  --popover: var(--color-surface);
+  --popover-foreground: var(--color-foreground);
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-primary-text);
+  --secondary: var(--color-surface-raised);
+  --secondary-foreground: var(--color-foreground);
+  --muted: var(--color-surface-raised);
+  --muted-foreground: var(--color-muted);
+  --accent: var(--color-hover);
+  --accent-foreground: var(--color-foreground);
+  --destructive: var(--color-danger);
+  --destructive-foreground: var(--color-background);
+  --border: var(--color-border);
+  --input: var(--color-border-strong);
+  --ring: var(--color-primary);
+  --chart-1: var(--color-primary);
+  --chart-2: var(--color-success);
+  --chart-3: var(--color-warning);
+  --chart-4: var(--color-info);
+  --chart-5: var(--color-danger);
+  --sidebar-background: var(--color-sidebar);
+  --sidebar-foreground: var(--color-foreground);
+  --sidebar-primary: var(--color-primary);
+  --sidebar-primary-foreground: var(--color-primary-text);
+  --sidebar-accent: var(--color-hover);
+  --sidebar-accent-foreground: var(--color-foreground);
+  --sidebar-border: var(--color-border);
+  --sidebar-ring: var(--color-primary);
+}
+
+* { border-color: hsl(var(--color-border)); }
+body { margin: 0; color: hsl(var(--color-text)); background: hsl(var(--color-background)); font-family: var(--font-geist-sans), sans-serif; font-size: 14px; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: var(--color-transparent); }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+::selection { color: hsl(var(--color-primary-text)); background: hsl(var(--color-primary)); }
+:focus-visible { outline: 2px solid hsl(var(--color-primary)); outline-offset: 4px; }
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-thumb { background: hsl(var(--color-border-strong)); border-radius: 8px; }
+
+@layer components {
+  .panel { @apply rounded-2xl border; background: hsl(var(--color-surface)); box-shadow: 0 3px 16px hsl(var(--color-shadow)); animation: component-enter 420ms ease-out backwards; }
+  .muted { color: hsl(var(--color-muted)); }
+  .eyebrow { @apply text-[10px] font-medium uppercase tracking-[0.16em]; color: hsl(var(--color-subtle)); }
+  .input { @apply flex h-10 w-full min-w-0 rounded-lg border px-3 text-sm transition-colors; background: hsl(var(--color-background)); color: hsl(var(--color-text)); }
+  .input::placeholder { color: hsl(var(--color-subtle)); }
+  .input:focus { border-color: hsl(var(--color-primary)); outline: none; box-shadow: 0 0 0 2px hsl(var(--color-primary-soft)); }
+  .input:disabled { opacity: .55; }
+  .field-label { @apply mb-2 block text-xs font-medium; color: hsl(var(--color-muted)); }
+  .nav-link { @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-colors; color: hsl(var(--color-muted)); }
+  .nav-link:hover { color: hsl(var(--color-text)); background: hsl(var(--color-hover)); }
+  .nav-link.active { color: hsl(var(--color-primary)); background: hsl(var(--color-primary-soft)); }
+  .page-title { @apply text-[28px] font-medium leading-tight tracking-[-0.04em] sm:text-[32px]; }
+  .table-cell { @apply whitespace-nowrap px-5 py-4 text-[13px]; }
+  .table-heading { @apply whitespace-nowrap px-5 py-3 text-left text-[11px] font-medium; color: hsl(var(--color-muted)); background: hsl(var(--color-surface-raised)); }
+  .avatar { @apply flex shrink-0 items-center justify-center rounded-full text-[10px] font-medium; color: hsl(var(--color-primary)); background: hsl(var(--color-primary-soft)); border: 1px solid hsl(var(--color-border-strong)); }
+  .motion { animation: component-enter 400ms ease-out backwards; }
+  .chart-tooltip { @apply rounded-lg border p-3 text-xs; background: hsl(var(--color-surface-raised)); color: hsl(var(--color-text)); }
+  .status-dot { @apply size-1.5 rounded-full; background: currentColor; }
+  .app-grid { background-image: radial-gradient(hsl(var(--color-border)) .55px, var(--color-transparent) .55px); background-size: 18px 18px; }
+}
+
+@keyframes component-enter { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes overlay-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; } }
+
+@keyframes enter-opacity { from { opacity: 0; } to { opacity: 1; } }
+.motion-fade { animation: enter-opacity 220ms ease-out backwards; }
+
+.motion-skeleton { animation: enter-opacity 220ms ease-out both, pulse 2s 220ms ease-in-out infinite; }
+
+/* TASK-005: shared Sidebar handles its 200 ms width transition. */
+.shell-navigation { position: relative; padding: 0 12px 20px; }
+.shell-nav-group + .shell-nav-group { margin-top: 16px; }
+.shell-group-label { display: flex; height: 28px; align-items: center; padding: 0 12px; }
+.shell-group-label-collapsed { justify-content: center; padding: 0; }
+.shell-nav-link { height: 42px; min-width: 0; }
+.shell-nav-link-collapsed { justify-content: center; gap: 0; padding: 0; }
+.shell-active-indicator { position: absolute; top: 0; left: 0; height: 22px; width: 3px; border-radius: 0 4px 4px 0; background: hsl(var(--color-primary)); transition: transform 180ms ease-in-out, opacity 150ms ease; pointer-events: none; }
+.route-enter { animation: route-fade-in 150ms ease-out both; }
+@keyframes route-fade-in { from { opacity: 0; } to { opacity: 1; } }

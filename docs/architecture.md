@@ -1,0 +1,177 @@
+# Архитектура Evo ERP
+
+## Текущая версия
+
+Модульный монолит Next.js 15 App Router на Node.js. В одном приложении работают маршруты, Server Actions, бизнес-сервисы и репозиторий. PostgreSQL подключён через Prisma 6. Версии закреплены lock-файлом. Фронтенд: React, Tailwind 3, Shadcn/Radix, TanStack Table, React Hook Form + Zod, Recharts, DnD Kit. TASK-001 переводит шрифты на `Geist` и `Geist_Mono` из `next/font/google`.
+
+## Design System
+
+TASK-001: база Slate, однотонный акцент Indigo-Violet. `components.json` задаёт `style: new-york`, `baseColor: slate`, `cssVariables: true`. Существующий проект не переинициализируется вложенным `create-next-app`; сохраняются App Router, `src/`, alias `@/*`, Next.js 15 и строгие настройки TypeScript.
+
+### Цвета и Tailwind
+
+`src/app/globals.css` — единственный источник палитры. `--color-*` хранят **каналы HSL**, а компоненты используют `hsl(var(--color-token))`. `:root` задаёт светлую Slate-палитру, `.dark` переопределяет все цветовые токены. Каноническое имя основного текста — `--color-foreground`; `--color-text` сохранён как совместимый alias. Основной акцент в светлой теме: `--color-primary: 262 80% 50%`; в тёмной светлота увеличена до 74% для контраста. Синие CTA и голубо-фиолетовые градиенты не применяются.
+
+Семантические статусы используют `--color-success`, `--color-warning`, `--color-danger`, `--color-info` и соответствующие мягкие поверхности. Overlay/glass/shadow содержат alpha внутри HSL-токена и применяются через `hsl(var(...))`. `--color-transparent` остаётся CSS-значением `transparent`.
+
+Shadcn aliases (`--background`, `--foreground`, `--primary`, `--card`, `--popover`, `--muted`, `--border`, `--input`, `--ring`, `--sidebar-*`) ссылаются на ERP-токены. `tailwind.config.ts` включает `darkMode: ["class"]`, semantic colors с поддержкой alpha, Geist font families, radius scale, тени через `--color-shadow` и `tailwindcss-animate`. Классы `bg-primary`/`text-foreground` являются отображением CSS variables; прямые цветовые utility-классы не используются.
+
+### Типографика и темы
+
+`layout.tsx` импортирует `Geist` и `Geist_Mono` из `next/font/google`, subsets `latin`/`cyrillic`, `display: swap`, переменные `--font-geist-sans`/`--font-geist-mono`. Next.js загружает файлы при сборке и отдаёт их локально из `/_next/static/media`; браузер не обращается к Google Fonts. Для первой сборки требуется доступ к Google Fonts. Inter отсутствует.
+
+Общий ThemeProvider на `next-themes` управляет классом `dark`/`light` на `<html>`, хранит выбор в `erp-theme` и устанавливает тему до гидратации. Тёмная тема используется по умолчанию. Отдельный механизм `data-theme` удалён, чтобы разные наборы компонентов не расходились по теме. Settings и Sonner используют один provider.
+
+### Компоненты
+
+В `src/components/ui/`: Button, Input, Label, Textarea, Select, Table, Badge, Avatar, DropdownMenu, Dialog, Sheet, Sidebar, Card, Form, Command, Popover, Calendar, Separator, Skeleton, Tooltip и Sonner. Существующие Button/Input/Badge/Dialog адаптированы с сохранением совместимости используемых бизнес-экранов; остальные получены Shadcn CLI и доработаны под правила проекта. Дополнительный Tooltip установлен как зависимость Sidebar.
+
+`toast.tsx` — совместимый entry point к Sonner: `import { toast } from "@/components/ui/toast"`. Старый Radix Toast больше не поставляется актуальным registry, вместо него используется поддерживаемый Sonner и один Toaster в корневом layout. Toast получает цветовые классы из общей палитры.
+
+Каталог `/design-system` защищён общим dashboard layout и содержит интерактивные примеры всех основных primitives, включая RHF-валидацию, календарь, Sheet, Command и уведомления. Он не добавлен в бизнес-навигацию; предназначен для разработки и визуальной проверки. Примеры не создают бизнес-записи. Calendar по умолчанию использует русскую локаль и доступные русские названия элементов управления.
+
+Form-компоненты используют RHF/Zod и Radix Slot/Label. Публичный `useFormField()` возвращает Result: отсутствие FormProvider/FormField/FormItem отображается ошибкой конфигурации вместо `throw`. Публичный `useSidebar()` тоже возвращает Result; встроенные sidebar primitives при отсутствии provider остаются инертными. Skeleton имеет детерминированную ширину для стабильной гидратации.
+
+### Движение и доступность
+
+Существующие панели и бизнес-элементы используют entrance fade/slide, новые primitives — `motion-fade` без изменения transform, чтобы не нарушать позиционирование Radix. После entrance animation стиль возвращается к обычным CSS-правилам, поэтому анимация не перекрывает opacity состояния disabled. Sheet и popover сохраняют анимации открытия/закрытия. Skeleton сочетает fade-in и pulse. `prefers-reduced-motion` ограничивает анимацию одним коротким циклом. У интерактивных элементов — focus ring, у модальных окон — Radix focus trap, заголовки/описания и Escape. CommandDialog содержит обязательные доступные Title/Description.
+
+### Зависимости и пределы TASK-001
+
+Добавлены Auth.js v5 (`next-auth@5.0.0-beta.32`), TanStack Virtual, DnD Sortable, date-fns, cmdk, Sonner и зависимости UI. На момент выполнения v5 опубликован под beta-tag; точная версия закрепляется в manifest/lock. В TASK-001 установка Auth.js ещё не меняла авторизацию; TASK-004 ниже выполняет переход на Credentials/JWT. Данные и доменная логика модулей не меняются. Проверка TASK-001 — `npm run build` и визуальный осмотр, без новых тестовых файлов вне CHECKPOINT.
+
+## Поток операции
+
+`page → module component → shared UI → module action → module service → document service → repository`.
+
+`getSession()` определяет workspace и роль. Сервис проверяет полномочия, Zod-схему домена, версию и бизнес-инварианты. Репозиторий ограничивает запрос workspace и сохраняет документ, поступление и событие аудита в одной транзакции. Ожидаемые ошибки и сбои инфраструктуры преобразуются в `Result`; исключения наружу намеренно не выбрасываются. Обработчик `error.tsx` нужен для непредвиденных ошибок рендера самого React/Next.js.
+
+## Shared-контракты и Result — TASK-003
+
+`src/types/shared.ts` — общий контракт без зависимостей от React, Prisma и серверного окружения:
+
+```ts
+type AppError = {
+  code: ErrorCode;
+  message: string;
+  meta?: Record<string, unknown>;
+};
+type Result<T, E = AppError> =
+  | { ok: true; data: T }
+  | { ok: false; error: E };
+```
+
+Сервисы и Server Actions возвращают `Result<T>` или `Promise<Result<T>>`. Проверка `ok` сужает union: до неё нельзя читать data/error. Ошибка — обычный объект, не Error instance; она пригодна для передачи через границу сервера при условии JSON-совместимых data/meta. `E` позволяет явно задать собственный тип ошибки, но shared-конструкторы используют AppError. В React-компонентах и чистых форматтерах сохраняется естественный return type (JSX/string); Result применяется к операциям, которые возвращают ошибку вызывающему коду.
+
+```ts
+import { err, ok } from "@/lib/errors";
+import type { Result } from "@/types/shared";
+
+/** Validate an example label using the shared outcome contract. */
+function validateLabel(value: string): Result<string> {
+  const label = value.trim();
+  return label ? ok(label) : err("VALIDATION", "Введите название");
+}
+
+const result = validateLabel("Счёт");
+if (result.ok) console.log(result.data);
+else console.error(result.error.message);
+```
+
+`src/lib/errors.ts` предоставляет `ok(data)`, `err(code, message, meta?)`, `createError(code, message, meta?)` и `isNotFound(error: unknown)`. `createError` возвращает AppError, `err` — failed Result; отсутствующее meta не добавляется как undefined при exactOptionalPropertyTypes. `isNotFound` принимает AppError, failed Result или Prisma-подобную ошибку с code=P2025 и возвращает boolean. Он не импортирует Prisma, не распознаёт ошибки по тексту и не преобразует прочие сбои в NOT_FOUND. Имена `success` и `failure<T>` сохранены для существующих потребителей и используют те же конструкторы.
+
+ErrorCode: VALIDATION, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, STORAGE, CONFIGURATION. Сбой внешней библиотеки перехватывается на границе инфраструктуры и превращается в безопасное сообщение; не передавать stack, пароли, SQL или необработанное исключение в meta. Helpers не выполняют автоматическую очистку произвольных metadata. HTTP-статус назначает route handler, UI показывает сообщение из Result.
+
+### Пагинация, сортировка и фильтры
+
+`PaginatedResponse<T> = { data: T[]; total: number; page: number; pageSize: number; totalPages: number }`. Page начинается с 1, pageSize положительный, total — число записей после фильтрации до пагинации; totalPages = ceil(total / pageSize), для пустого набора 0. Чтение может возвращать `Promise<Result<PaginatedResponse<T>>>`. Метаданные формирует сервис; shared-тип сам не проверяет их арифметику и не включает серверную пагинацию в существующий UI.
+
+`SortConfig<TField extends string = string>` содержит field и direction: asc/desc. Несколько ключей передаются массивом с явным приоритетом. `FilterConfig<TField>` — union по operator: eq/ne принимают scalar string/number/boolean/null; contains/startsWith/endsWith — string; gt/gte/lt/lte — number или ISO string; in/notIn — массив scalar; isNull/isNotNull — без value. Пример: `SortConfig<"number" | "dueDate">`, `FilterConfig<"status" | "total">`. Даты передаются ISO-строками, точные Decimal — строками; числовое сравнение Decimal-строк нужно реализовать в БД, не лексикографически в JS. Публичный endpoint обязан валидировать вход Zod, whitelist полей/операторов и workspace. Эти типы не являются готовым Prisma where/orderBy.
+
+### Утилиты и клиент БД
+
+`src/lib/utils.ts` используется сервером и клиентом:
+
+| API | Контракт |
+| --- | --- |
+| `cn(...inputs)` | clsx + tailwind-merge, условные классы и устранение Tailwind-конфликтов |
+| `formatCurrency(amount, currency = "RUB")` | Целые минимальные единицы: safe integer number, bigint или целочисленная Decimal-строка. Количество знаков определяется валютой (RUB/USD 2, JPY 0, KWD 3). Вывод ru-RU без дробной части при целой сумме; разделение целой/дробной частей через BigInt исключает потерю точности. Пример: 12345 → 123,45 ₽. Некорректное значение/код валюты → «—» |
+| `formatDate(date, format = "dd.MM.yyyy")` | ISO string, Date или epoch milliseconds; Unicode-токены date-fns, locale ru, **локальная зона среды выполнения**. Чистая дата разбирается как локальная календарная дата, timestamp — как момент времени. Неверная дата/формат → «—». Для SSR/client одного timestamp требуется согласованная timezone либо заранее отформатированный сервером текст |
+| `generateId(prefix = "")` | crypto.randomUUID(), без prefix — UUID, с prefix — prefix_UUID. Prefix задаётся кодом, генерация выполняется в обработчике/сервисе, не при рендере. Требуется поддерживаемый Node.js или secure browser context; ID не заменяет токен сессии |
+| `truncate(value, maxLength = 80, suffix = "…")` | Длина в графемах через Intl.Segmenter, суффикс входит в лимит. Не разрезает combining sequences или emoji; неположительный/нечисловой лимит → пустая строка |
+
+Совместимые `money(amount, compact)` (RUB-копейки), `dateLabel(value)` (краткая дата в Europe/Moscow) и `initials` сохранены. Обычный money использует formatCurrency, compact сохраняет прежнее сокращение. Форматтеры — только отображение; «—» не заменяет валидацию денежного ввода. Сервисы документов и платежей используют общий generateId без изменения UUID-формата существующих идентификаторов.
+
+`src/lib/db.ts` закрыт `server-only`. Единственный экспорт db берётся из `globalThis.prisma` либо создаётся через `new PrismaClient()`. В development клиент сохраняется в globalThis для hot reload; в production используется кеш модуля, без глобального сохранения нового клиента. Не вызывать disconnect после каждого запроса и не создавать PrismaClient внутри services/components. Новый singleton не устанавливает соединение до первого запроса; ошибки запросов обрабатывает repository, демофолбэка нет.
+
+## DocType и домены
+
+TASK-002 добавляет нормализованную схему всех модулей: Contact/Deal/Activity, Invoice/InvoiceItem/Payment, Product/Warehouse/StockItem/StockMovement, Employee/Leave, Project/Task. AUTH расширен полями UserRole/isActive, членством и структурированным AuditLog. Всего 21 модель и 13 enums. Полное описание связей, единиц измерения, FK и границ ответственности — [modules/database.md](modules/database.md).
+
+Пять каталогов модулей имеют `types.ts`, `schema.ts`, `actions.ts`, `queries.ts`, `service.ts`, `config.ts`, `components/`. Общая модель `Document` хранит `domain`, `workspaceId`, `version`, временные метки и JSONB `data`. JSON-поля валидируются на чтении из PostgreSQL и на каждой записи. У каждого домена отдельный enum статусов и уточнения схемы; доменные типы выводятся через Zod.
+
+Базовая форма документа содержит `title`, `subtitle`, `status`, `amount`, `quantity`, `email`, `date`, `progress`, `notes`. В разных DocType поля имеют доменные подписи. Такое ограниченное ядро позволяет переиспользовать форму и таблицу без дублирования CRUD. Это фиксированные схемы, не реализованный конструктор пользовательских объектов. При усложнении домена следует расширять его схему или выделять реляционные модели и сервисы, сохраняя контракты Result.
+
+Деньги — целые копейки. UI принимает рубли и переводит их в копейки на границе формы. Переходный `DocumentPayment` сохраняет прежний PostgreSQL Int и лимит 20 млн ₽ за операцию; JSON-документы сохраняют текущий лимит суммы 10 млрд ₽. Новые денежные поля Contact-связанных сделок/счетов/товаров/проектов используют Prisma Decimal(20,0), тоже в минимальных единицах. Нормализованный Payment относится к Invoice и хранится отдельно от DocumentPayment. TaxRate — Decimal(5,2), количества — Decimal(20,3). Суммы новых типов нельзя без проверки диапазона преобразовывать в JS number; передавать в DTO строкой. Новые таблицы подготовлены, но UI и полноценные налоговые/бухгалтерские сервисы ещё не переведены на них.
+
+## Хранение
+
+- **PostgreSQL**: нормализованные модели TASK-002 и переходный Document-слой. `UserRole` отображается на старый enum `Role`, `AuditLog` — на таблицу `AuditEvent`, `DocumentPayment` — на старую `Payment`, а новый `Payment` — на `invoice_payments`. Начальная миграция сохранена; `20261018065839_init_all_modules` добавляет таблицы и поля без удаления старых данных. Миграция выполняется транзакционно, содержит 43 CHECK-ограничения и составные tenant-FK. Ссылка на исполнителя/владельца всегда проверяет Membership в том же workspace. Индексы и бизнес-идентификаторы ограничены tenant. Текущий repository использует `auditLog`/`documentPayment`, сохраняя контракт UI. Проверка версии через `updateMany/deleteMany` защищает текущие документы от параллельной записи.
+- **Демо**: `ERP_DEMO_MODE=true`, общее пространство `demo-workspace`, явно отмеченные примеры. JSON в `.data/demo-workspace.json`. В одном Node.js-процессе операции сериализуются очередью `globalThis`; запись идёт во временный файл и атомарный rename. Файл проверяется схемой; повреждение не приводит к тихой потере или пересозданию данных. Несколько процессов и serverless для демохранилища не поддерживаются.
+- **Без fallback**: выключенный деморежим всегда использует PostgreSQL. Сбой БД отображается ошибкой.
+
+## Tenant isolation и RBAC
+
+TASK-004 использует NextAuth v5 (`next-auth@5.0.0-beta.32`), Credentials provider и JWT strategy. `/api/auth/[...nextauth]` предоставляет GET/POST Auth.js; callback JWT записывает id, role, workspaceId и внутренний sessionId. Session callback передаёт user.id/user.role/workspaceId/workspaceName и expires, но не sessionId, хеш пароля или JWT. Module augmentation находится в `src/types/next-auth.d.ts` (JWT расширяет исходный `@auth/core/jwt`).
+
+Credentials разбираются через Zod, пароль проверяется существующим scrypt с солью и constant-time сравнением; неизвестный email выполняет dummy scrypt. Provider возвращает User/null по контракту Auth.js, а бизнес-фасад и Server Actions — Result. Исключения библиотеки ловятся в auth-actions.ts. Email нормализуется, роль и workspace из формы/update payload не принимаются: вход выбирает первое активное Membership по workspaceId. User.role не предоставляет обхода Membership, в том числе для SUPER_ADMIN.
+
+JWT зашифрован и защищён Auth.js в HttpOnly/SameSite=Lax cookie; на HTTPS используется Secure cookie с __Secure-prefix. Обязателен AUTH_SECRET (или совместимый NEXTAUTH_SECRET), AUTH_URL задаёт публичный origin с HTTPS для внешнего production. Ключ не генерируется автоматически и не попадает в NEXT_PUBLIC. Срок доступа — 12 часов: в Session хранится SHA-256 случайного registry ID, user/workspace и фиксированный expiresAt. Этот ID включён в защищённый JWT, сама таблица не содержит cookie. При каждом чтении JWT повторно проверяются registry, срок, User.isActive, Membership.isActive и текущая Membership.role. Поэтому смена роли/отзыв действуют на следующей серверной операции, даже если браузер ещё показывает прежние кнопки. Logout сначала удаляет точную запись registry, затем Auth.js очищает cookie; событие signOut также отзывает запись для стандартного Auth.js endpoint. Старые opaque erp_session cookie не принимаются: после обновления требуется новый вход. Старые строки Session не превращаются в JWT автоматически.
+
+На сбое PostgreSQL JWT не получает права и session содержит authError; серверный Result возвращает STORAGE, UI hook блокирует действия. Отключённое членство даёт FORBIDDEN, отозванная/истёкшая сессия или неактивный User — UNAUTHORIZED. Ошибка инфраструктуры никогда не открывает демопространство. ERP_DEMO_MODE=true по-прежнему явно включает публичный учебный доступ: сервер и `/api/auth/session` возвращают одну synthetic ADMIN identity без БД; это отдельный режим, не доказательство реального входа.
+
+### Матрица разрешений
+
+Каноническая client-safe матрица — `src/lib/permissions.ts`, PERMISSIONS/hasPermission также экспортируются из `src/lib/auth.ts`. Клиент импортирует только permissions.ts, чтобы не включать Prisma/secret в bundle.
+
+| Роль | canDelete | canExport | canManageUsers | canViewAll |
+| --- | --- | --- | --- | --- |
+| SUPER_ADMIN | Да | Да | Да | Да |
+| ADMIN | Да | Да | Да | Да |
+| MANAGER | Да* | Да | Нет | Да |
+| AGENT | Нет | Нет | Нет | Да |
+| READONLY | Нет | Нет | Нет | Да |
+
+Матрица — явная стартовая политика, поскольку конкретные значения не были заданы TASK-004. canViewAll означает просмотр всех документов **текущего workspace**, доступ к которому уже проверен; не других tenants и не обход HR field-level policy. Все пять ролей сохраняют прежний доступ на чтение. AGENT создаёт/изменяет записи без удаления/экспорта; READONLY не выполняет мутации. * MANAGER дополнительно не удаляет HR-записи. Счета с платежами защищены при любой роли. hasPermission для неизвестной/отсутствующей роли возвращает false. canManageUsers — право для будущего управления участниками; сам экран/endpoint этой задачей не создаётся.
+
+AuthSessionProvider оборачивает dashboard с проверенной сервером initial Session. `usePermissions()` использует useSession и возвращает role, can(permission), isAdmin и isLoading. При loading, unauthenticated или authError права закрыты. isAdmin истинен только для ADMIN/SUPER_ADMIN. Обновление сессии при фокусе и каждые 60 секунд подтягивает роль в UI; сервер не ждёт этого обновления. Рендеры таблиц, kanban, кнопок создания/удаления/экспорта и settings используют те же правила.
+
+Сервис authorize защищает create/update/delete, repository проверяет canViewAll и workspace, экспортные Server Actions повторно проверяют canExport и читают данные только из своего workspace. getExportDocuments принимает domain/IDs, проверяет Zod и отклоняет недоступный ID; dashboard CSV формируется из свежего серверного snapshot. Скрытая кнопка не является защитой. Разрешение экспорта управляет предоставляемой функцией и endpoint; оно не мешает человеку вручную скопировать уже доступные для чтения данные. Управление Membership, invitations, переключение workspace и отдельные права payroll остаются следующими задачами.
+
+## Events и UI
+
+AuditLog (таблица AuditEvent для совместимости) — транзакционный журнал мутаций, не шина асинхронных обработчиков. Добавлены actorId → Membership, entityType/entityId, before/after и requestId. Текущий repository сохраняет actorId и идентификатор документа; UI по-прежнему получает компактный AuditEvent DTO. Dashboard и панель событий читают последние 50 записей; PostgreSQL сохраняет весь журнал. В демофайле журнал ограничен 50 событиями. Outbox, подписчики, гарантированная доставка и workflow engine остаются отдельным этапом.
+
+Сборка UI основана на общих `src/components/ui/`, `blocks/`, `layout/`. ModuleWorkspace соединяет форму, таблицу и kanban. После успешной мутации UI обновляет запись и запрашивает новый серверный snapshot через `router.refresh()`. Dashboard считает показатели из документов и платежей; выбор периода действует на поступления и график, оперативные остатки и активные записи отражают текущее состояние. CSV содержит отображаемые/выбранные строки и защищён от formula injection.
+
+Палитра только через CSS variables в `globals.css`; тёмная и светлая темы. Анимации входа у панелей, строк и UI primitives; `prefers-reduced-motion` отключает движение. Radix обеспечивает focus trap в модальных окнах. Мобильный sidebar открывается диалогом. Горизонтальная прокрутка ограничена таблицами и kanban.
+
+## Layout Shell — TASK-005
+
+AppShell использует общий `SidebarProvider` и `Sidebar` из `src/components/ui/sidebar.tsx`; отдельный механизм collapse не вводится. `app-sidebar.tsx` отображает одно меню на desktop и в мобильном Sheet. Навигация задаётся единожды в `navigation.ts`: Overview → Dashboard; Business → CRM/Finance/Inventory; Operations → HR/Projects; System → Settings. Эти же ссылки используются в Header breadcrumbs и глобальном поиске. Root активен только для `/`, модуль — для точного пути и вложенных сегментов. Query string не меняет текущий раздел.
+
+Desktop Sidebar имеет ширину 248 px, compact — 80 px. Shared primitive анимирует ширину и flex-spacer CSS transition 200 ms; контент занимает оставшееся место без фиксированного left padding. Desktop начинается с общего Shadcn breakpoint 768 px. В compact links сохраняют aria-label и Tooltip. Пользовательский `sidebar_state` cookie содержит только boolean-предпочтение; dashboard layout читает его при SSR, чтобы сохранить вид после reload. Cookie не участвует в авторизации. Cmd/Ctrl+B переключает Sidebar через существующий provider.
+
+Мобильное меню — Radix Sheet с focus trap, Escape/overlay и явной кнопкой закрытия. Переход по ссылке закрывает Sheet. После обычного закрытия фокус возвращается на Header trigger; при открытии нового диалога фокус остаётся в нём. При выходе на desktop мобильное меню закрывается. SidebarContent прокручивается внутри панели, поэтому группы и профиль доступны на низком экране.
+
+Один active indicator расположен внутри navigation и перемещается CSS `transform` transition 180 ms. Его позиция измеряется по активной ссылке и пересчитывается ResizeObserver после изменения ширины/высоты. Цвет/фон активной строки и `aria-current=page` работают независимо от анимации. Для `/design-system` нет ложного активного пункта.
+
+`(dashboard)/template.tsx` создаёт новый wrapper для route content с fade-in 150 ms. AppShell находится в persistent layout, поэтому Sidebar не перемонтируется при переходах. Поиск/query обновления не создают лишнюю route animation; входные анимации отдельных компонентов сохраняются. Все transitions и animations учитывают общий `prefers-reduced-motion` override.
+
+Header содержит управление Sidebar, breadcrumbs, поиск Cmd/Ctrl+K, уведомления, профиль и переключатель next-themes. Для первого SSR/client render используется нейтральная иконка темы до mount, что исключает hydration mismatch. Header и Settings используют один `erp-theme`/класс `.dark`; после reload тема восстанавливается. Цвета берутся только из semantic CSS variables, Geist и существующие primitives сохраняются.
+
+Общие entrance keyframes именуются `component-enter`, чтобы не конфликтовать с `enter` из tailwindcss-animate и сохранить slide у Sheet. `/favicon.ico` перенаправляется на существующий `/icon.svg`, поэтому запросы старых браузерных вкладок не дают лишний 404.
+
+## Границы текущего шаблона
+
+Нет production rate limiting входа, MFA, восстановления пароля, приглашений, редактирования ролей, переключения tenants, RLS, field-level RBAC, фоновой очистки сессий и резервного копирования. Текущий UI получает snapshot Document-слоя всего workspace; нужны постепенный перевод на новые модели, серверная пагинация/фильтры и SQL-агрегации. В TASK-002 миграция и ряд FK/CHECK проверены на живой локальной PostgreSQL 17. TASK-004 проверяет основные HTTP-сценарии Credentials/JWT и RBAC вручную; полная автоматическая проверка ролей, гонок и всех новых доменных сервисов остаётся CHECKPOINT. Не заявлять production readiness до его завершения.

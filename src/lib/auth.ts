@@ -1,29 +1,80 @@
 import "server-only";
-import { createHash } from "node:crypto";
-import { cookies } from "next/headers";
+import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
 import { db } from "@/lib/db";
-import { failure, success } from "@/lib/errors";
+import { err, ok } from "@/lib/errors";
+import { getCredentialUser, getDemoSession, getSessionIdentity, hasAuthSecret, isDemoMode, SESSION_MAX_AGE } from "@/lib/auth-service";
+import { canDeleteDocument, canWrite, isRole } from "@/lib/permissions";
 import type { Domain, Result, SessionContext } from "@/types/shared";
 
-/** Return whether this installation explicitly opts into local demo access. */
-export function isDemoMode(): boolean { return process.env.ERP_DEMO_MODE === "true"; }
+export { PERMISSIONS, hasPermission } from "@/lib/permissions";
+export { isDemoMode } from "@/lib/auth-service";
 
-/** Resolve tenant and role from a server-owned session, never from client input. */
+/** Auth.js v5 endpoints, JWT authentication and credentials sign-in/out adapters. */
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE },
+  pages: { signIn: "/login", error: "/login" },
+  providers: [Credentials({
+    credentials: { email: { label: "Email", type: "email" }, password: { label: "Пароль", type: "password" } },
+    async authorize(credentials) {
+      const result = await getCredentialUser(credentials);
+      return result.ok ? result.data : null;
+    },
+  })],
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        if (user.id) token.id = user.id;
+        if (user.role) token.role = user.role;
+        if (user.workspaceId) token.workspaceId = user.workspaceId;
+        if (user.workspaceName) token.workspaceName = user.workspaceName;
+        if (user.sessionId) token.sessionId = user.sessionId;
+      }
+      const identity = await getSessionIdentity({ ...(token.id ? { id: token.id } : {}), ...(token.workspaceId ? { workspaceId: token.workspaceId } : {}), ...(token.sessionId ? { sessionId: token.sessionId } : {}) });
+      if (!identity.ok) {
+        if (identity.error.code === "UNAUTHORIZED") return null;
+        token.authError = identity.error.code;
+        token.role = "READONLY";
+        return token;
+      }
+      delete token.authError;
+      token.role = identity.data.role;
+      token.name = identity.data.name;
+      token.email = identity.data.email;
+      token.workspaceName = identity.data.workspaceName;
+      token.sessionExpires = identity.data.expires;
+      return token;
+    },
+    session({ session, token }) {
+      session.user.id = token.id ?? "";
+      session.user.role = isRole(token.role) ? token.role : "READONLY";
+      session.user.workspaceId = token.workspaceId ?? "";
+      session.user.workspaceName = token.workspaceName ?? "";
+      if (token.authError) session.authError = token.authError;
+      return { ...session, expires: token.sessionExpires ?? session.expires };
+    },
+  },
+  events: {
+    async signOut(message) {
+      if ("token" in message && message.token?.sessionId) await db.session.deleteMany({ where: { tokenHash: message.token.sessionId } });
+    },
+  },
+});
+
+/** Resolve a live workspace identity from Auth.js; demo access remains an explicit installation mode. */
 export async function getSession(): Promise<Result<SessionContext>> {
-  if (isDemoMode()) return success({ workspaceId: "demo-workspace", workspaceName: "Evo Studio", userId: "demo-admin", name: "Александр Волков", email: "alex@demo.example", role: "ADMIN", demo: true });
+  if (isDemoMode()) return ok(getDemoSession());
+  if (!hasAuthSecret()) return err("CONFIGURATION", "Для входа задайте AUTH_SECRET в окружении сервера");
   try {
-    const token = (await cookies()).get("erp_session")?.value;
-    if (!token) return failure("UNAUTHORIZED", "Войдите в рабочее пространство");
-    const session = await db.session.findUnique({ where: { tokenHash: createHash("sha256").update(token).digest("hex") }, include: { user: true } });
-    if (!session || session.expiresAt < new Date()) return failure("UNAUTHORIZED", "Сессия истекла. Войдите снова");
-    const membership = await db.membership.findUnique({ where: { userId_workspaceId: { userId: session.userId, workspaceId: session.workspaceId } }, include: { workspace: true } });
-    if (!membership) return failure("FORBIDDEN", "Нет доступа к рабочему пространству");
-    return success({ workspaceId: membership.workspaceId, workspaceName: membership.workspace.name, userId: session.user.id, name: session.user.name, email: session.user.email, role: membership.role, demo: false });
-  } catch { return failure("STORAGE", "Сервис авторизации недоступен. Проверьте подключение к PostgreSQL"); }
+    const session = await auth();
+    if (!session?.user?.id || !session.user.workspaceId) return err("UNAUTHORIZED", "Войдите в рабочее пространство");
+    if (session.authError) return err(session.authError, session.authError === "FORBIDDEN" ? "Нет доступа к рабочему пространству" : "Сервис авторизации недоступен. Проверьте PostgreSQL");
+    return ok({ userId: session.user.id, name: session.user.name ?? "", email: session.user.email ?? "", role: session.user.role, workspaceId: session.user.workspaceId, workspaceName: session.user.workspaceName, demo: false, expires: session.expires });
+  } catch { return err("STORAGE", "Сервис авторизации недоступен. Проверьте подключение к PostgreSQL"); }
 }
 
-/** Enforce the template's default write policy at the service boundary. */
+/** Enforce writes and deletion permissions on every server operation, including the HR exception. */
 export function authorize(session: SessionContext, domain: Domain, operation: "create" | "update" | "delete"): Result<true> {
-  if (session.role === "VIEWER" || (session.role === "MANAGER" && domain === "hr" && operation === "delete")) return failure("FORBIDDEN", "Недостаточно прав для этого действия");
-  return success(true);
+  if (!canWrite(session.role) || (operation === "delete" && !canDeleteDocument(session.role, domain))) return err("FORBIDDEN", "Недостаточно прав для этого действия");
+  return ok(true);
 }
