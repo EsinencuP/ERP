@@ -1,5 +1,9 @@
 # Проверки реализации
 
+## Vercel deployment
+
+18 октября 2026: актуальный код опубликован из GitHub в существующий Vercel project erp. Устранён старый build failure без root layout; Prisma Postgres мигрирована, настроены production auth и первый ADMIN, bootstrap-пароль удалён из env. HTTPS login, защищённый health postgresql, восемь основных страниц и Contact create/read/update/filter/delete проверены реальными запросами; smoke contact удалён, аудит сохранён. Отчёт: [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## Актуальный статус TASK-010 / CHECKPOINT-02
 
 18 октября 2026: TASK-010 закрыт, CHECKPOINT-02 пройден. ContactFormSheet создаёт/редактирует через общий CRM service, использует RHF/Zod onBlur и Sonner, Cmd/Ctrl+Enter/Escape. Non-modal Sheet сохраняет доступ к таблице и draft; фиксированная версия защищает от перезаписи. Финальные build/typecheck/diff-check прошли; `npm run check:crm` — 9/9 pass на настоящих HTTP/Auth/PostgreSQL. Браузер: таблица/сортировка/фильтр, pointer drag с reload, Activity detail, blur/toast/save/Escape/focus, READONLY/AGENT, CONFLICT/network/pending; один повторный shortcut дал одну запись и audit. Desktop/mobile 1440/390 px в обеих темах без overflow, reduced motion, свежая консоль без ошибок. Отчёты: [TASK-010.md](TASK-010.md), [CHECKPOINT-02.md](CHECKPOINT-02.md).
