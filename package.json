@@ -7,6 +7,7 @@
     "build": "prisma generate && next build",
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
+    "check:crm": "node --env-file=.env --test scripts/checkpoint-crm.test.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "node --env-file=.env --import tsx prisma/seed.ts",

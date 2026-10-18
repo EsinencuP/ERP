@@ -132,3 +132,11 @@ CHECK-ограничения находятся в SQL миграции: Prisma 
 Начальная миграция `202610170001_init` сохраняется. Новая `20261018065839_init_all_modules` добавляет доменные таблицы, новые поля AUTH, индексы, составные FK и CHECK. Содержит транзакцию BEGIN/COMMIT. Таблицы/колонки со старыми данными не удаляются; меняется только FK аудита с Cascade на Restrict.
 
 Команды: `npx prisma generate`, затем `npx prisma migrate dev --name init_all_modules` для разработки. Для уже сохранённых миграций на сервере — `npm run db:migrate`. Не выполнять reset при наличии данных. Результаты фактической проверки фиксируются в `docs/TASK-002.md`.
+
+## CRM сервисы — TASK-006
+
+Нормализованные Contact/Deal/Activity теперь доступны через отдельный CRM Server API (см. [crm.md](crm.md)). FK дополняются сервисными проверками: активные User/Membership ответственного в текущем workspace, соответствие Activity.contactId контакту Activity.dealId. При указании только dealId контакт активности выводится из сделки.
+
+Contact update/delete и Deal stage update включают version в WHERE и увеличивают её при обновлении. Serializable-транзакция объединяет чтение, проверки, мутацию и AuditLog с JSON before/after. Restrict сохраняет контакт, если он используется. Пагинация/группировка читается через RepeatableRead. Денежные суммы поступают в Prisma.Decimal без округления и выходят строками. Новые таблицы/миграции этой задачей не добавляются. Переходные Document-записи не копируются в нормализованные таблицы автоматически.
+
+TASK-009: Contact.tags — PostgreSQL TEXT[] с default [] и CHECK на non-null array, отсутствие null-элементов и максимум 20 значений. Миграция 20261018084403_contact_detail_tags добавляет только поле/constraint внутри BEGIN/COMMIT, существующие контакты получают []. Zod дополнительно требует trimmed непустые строки до 32 символов и отсутствие повторов без учёта регистра. Изменение tags использует version и тот же атомарный AuditLog, что остальные поля Contact. Лента detail читает Activity/Deal только после tenant-scoped проверки родителя; count и страницы согласованы RepeatableRead.

@@ -174,4 +174,44 @@ Header содержит управление Sidebar, breadcrumbs, поиск Cm
 
 ## Границы текущего шаблона
 
-Нет production rate limiting входа, MFA, восстановления пароля, приглашений, редактирования ролей, переключения tenants, RLS, field-level RBAC, фоновой очистки сессий и резервного копирования. Текущий UI получает snapshot Document-слоя всего workspace; нужны постепенный перевод на новые модели, серверная пагинация/фильтры и SQL-агрегации. В TASK-002 миграция и ряд FK/CHECK проверены на живой локальной PostgreSQL 17. TASK-004 проверяет основные HTTP-сценарии Credentials/JWT и RBAC вручную; полная автоматическая проверка ролей, гонок и всех новых доменных сервисов остаётся CHECKPOINT. Не заявлять production readiness до его завершения.
+Нет production rate limiting входа, MFA, восстановления пароля, приглашений, редактирования ролей, переключения tenants, RLS, field-level RBAC, фоновой очистки сессий и резервного копирования. Dashboard и прежние модульные экраны получают snapshot Document-слоя всего workspace. Таблица Contacts и отдельная воронка Deal используют серверную пагинацию нормализованных моделей; нужны перевод остальных экранов/данных, пагинация остальных модулей и SQL-агрегации. В TASK-002 миграция и ряд FK/CHECK проверены на живой локальной PostgreSQL 17. TASK-004 проверяет основные HTTP-сценарии Credentials/JWT и RBAC вручную; TASK-006 — CRM API, гонку одной версии и rollback аудита. Полная автоматическая проверка ролей, гонок и всех новых доменных сервисов остаётся CHECKPOINT. Не заявлять production readiness до его завершения.
+
+## CRM Server API — TASK-006
+
+Нормализованный поток: `crm/actions → crm/service → Prisma Contact/Deal/Activity`. `crm/access.ts` разрешает Auth.js через `getSession()` и проверяет live Membership/RBAC; workspace и actor берутся только из сессии. В явном деморежиме этот API возвращает CONFIGURATION и не подменяет PostgreSQL файлами.
+
+Zod-схемы строгие: tenant/id/version/timestamps нельзя внедрить в DTO. Изменения и auditLog.create выполняются одной Serializable-транзакцией; обновление/удаление требует ожидаемую version. Ошибки драйвера преобразуются в Result, конфликты сериализации требуют повторного чтения. Сбой аудита откатывает мутацию. После успешного commit действия вызывают revalidatePath для `/crm` и `/`; сбой инвалидирования логируется, но не маскирует уже сохранённый результат.
+
+`queries.ts` читает только текущий workspace. Страница и count согласованы через RepeatableRead; pageSize 1–100, сортировка по whitelist со стабильным id. Kanban возвращает шесть колонок с отдельной ограниченной страницей и total каждой. DTO сериализуют Decimal в точные строки копеек, timestamps в ISO, DATE в YYYY-MM-DD. Контракты и примеры — [modules/crm.md](modules/crm.md).
+
+Экран сделок `/crm` продолжает использовать Document через явно названные `getDealDocuments/createDealDocument/updateDealDocument/deleteDealDocument`. Он не читает нормализованные Deal и не смешивает их со старой моделью. Contacts подключены отдельной страницей в TASK-007, нормализованная воронка — в TASK-008; перенос прежней таблицы сделок и существующих данных остаётся отдельной задачей.
+
+## CRM Contacts Table — TASK-007
+
+`/crm/contacts/page.tsx` — Server Component: вызывает tenant-scoped getContacts и передаёт Result первой страницы плюс фиксированное время рендера в ContactsTable. Страница `/crm` сохраняет существующие сделки; общие вкладки связывают два экрана. В деморежиме нормализованные контакты показывают состояние конфигурации, без подмены PostgreSQL.
+
+Клиентская TanStack Table v8 использует getRowId=id, manualPagination/manualSorting/manualFiltering. Search debounce 300 ms; stage/sort/search сбрасывают страницу, выбор фильтров также сбрасывает selection. Выбор до 100 id/version сохраняется между страницами, checkbox заголовка действует только на текущую страницу. При загрузке показывается общий Skeleton; устаревшие асинхронные ответы игнорируются. Relative createdAt получает initialNow с сервера, затем обновляется раз в минуту, чтобы не нарушать гидратацию.
+
+ContactTableRow расширяет Contact безопасным owner summary (id/name/avatar), Prisma include не раскрывает пароль или Membership. getContactAssignees ищет до 50 активных участников своего workspace. Массовые deleteContacts/updateContactsAssignee проверяют все версии/ссылки и выполняют весь набор с audit в одной Serializable-транзакции. При любом конфликте нет частичного успеха; endpoint ограничен 100 разными id. Экспорт getContactsForExport повторно проверяет canExport (MANAGER/ADMIN/SUPER_ADMIN), читает выбранные записи либо полный фильтр с лимитом 5000, без тихого обрезания. CSV использует общий downloadCsv с escaping/BOM и защитой от formula prefixes, включая префиксы после пробельных символов.
+
+## CRM Deal Pipeline — TASK-008
+
+`/crm/pipeline/page.tsx` передаёт initialData из getDealsByStage и initialNow в DealKanban. Общая навигация CRM содержит Contacts, Pipeline и прежний Document Deals; существующие данные не копируются. Query возвращает PipelineDeal: базовый Deal плюс безопасный owner id/name/avatar и одну последнюю связанную Activity (id/subject/type/createdAt). Вложенное чтение Activity явно ограничено workspace. Все даты/Decimal сериализованы; мутации по-прежнему используют базовые audit snapshots.
+
+DealKanban использует @dnd-kit/core DndContext, шесть KanbanColumn с SortableContext, DealCard с useSortable и отдельный DragOverlay без повторной регистрации draggable. Колонка остаётся droppable даже без карточек. Drop меняет этап; порядок внутри этапа задаёт updatedAt desc/id asc, ручной порядок не сохраняется. Пагинация независима для каждой колонки, по 20 сделок, чтобы не скрывать данные за ограниченной начальной выборкой. Успешный перенос перечитывает первые страницы для согласованных counts и показа свежей сделки в начале этапа.
+
+PointerSensor поддерживает мышь/касание с handle touch-action:none; KeyboardSensor выбирает соседние колонки стрелками, включая пустые. Есть native stage select, aria-live и локализованные DnD announcements. Drop вне видимой области доски/Escape не выполняет мутацию. Авторизация на клиенте ограничивает affordances, updateDealStage заново проверяет серверную сессию, workspace, версию и audit.
+
+Перенос немедленно обновляет карточку/счётчики и вызывает updateDealStage(id,version,stage). Только одна операция in flight: snapshot rollback не может затереть другое локальное сохранение. Ошибка Result откатывает весь snapshot; неизвестный результат сети требует обновления. После подтверждённого commit ошибки последующего чтения не откатывают сохранённый этап. До успешного обновления дальнейшие записи блокируются. UI показывает pending/error/retry/empty и route skeleton. Вероятности NEW/QUALIFIED/PROPOSAL/NEGOTIATION/WON/LOST = 10/25/50/75/100/0%; это явная стадийная оценка, не новое поле БД и не индивидуальный прогноз.
+
+## CRM Contact Detail — TASK-009
+
+`/crm/contacts/[id]` — отдельная Server Component страница с initial ContactDetail, timeline и связанной страницей сделок. Контакт проверяется по workspace/id до чтения дочерних записей. Timeline включает Activity с contactId контакта и legacy deal-only Activity с contactId=null, если Deal принадлежит контакту; каждый запрос ограничен workspace. Чтения/count выполняются в RepeatableRead; feed имеет фильтр type и bounded pagination. Activity.assignedTo показывается как ответственный, не выдаётся за автора.
+
+Contact получает сохраняемый String[] tags с default []; миграция добавляет поле без удаления данных. Zod ограничивает 20 тегами по 1–32 символа, без дублей без учёта регистра; updateContact сохраняет tags вместе с version increment и audit. Изменения контакта, назначение, tags и stage используют существующий сервис; новые Activity — createActivity. Для detail route добавлен revalidatePath('/crm/contacts/[id]', 'page'). UI использует RHF/Zod и общие primitives; неизвестный результат записи требует refresh, подтверждённая запись не маскируется ошибкой последующего чтения.
+
+## CRM Contact Forms — TASK-010
+
+ContactFormSheet переиспользуется для создания/редактирования из таблицы и редактирования из detail. Основан на shared Sheet/Radix с modal=false: без overlay, блокировки scroll, aria-hidden фона и focus trap. Взаимодействие с таблицей не закрывает панель и сохраняет draft; параллельные bulk/вторая форма недоступны. На узком экране панель занимает всю ширину, поля прокручиваются отдельно от footer. Shared Sheet получил только необязательный closeDisabled; обычные modal Sheet/sidebar сохраняют прежнее поведение.
+
+ContactFormSchema — pick общих контактных полей плюс stage из contactSchema. RHF mode/reValidateMode=onBlur показывают inline ошибки до submit; финальный submit также проверяет всю форму. Cmd/Ctrl+Enter действует внутри формы, Escape закрывает, пока запрос не выполняется. Фокус при открытии — имя, при закрытии — opener. Sonner toast.success подтверждает commit, toast.error сообщает invalid/result/network error. Snapshot id/version при открытии не заменяется свежей версией из фонового чтения: конфликт не превращается в тихое перезаписывание. Unknown result блокирует повтор до закрытия/refresh, без автоповтора создания.

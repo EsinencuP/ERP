@@ -1,5 +1,25 @@
 # Проверки реализации
 
+## Актуальный статус TASK-010 / CHECKPOINT-02
+
+18 октября 2026: TASK-010 закрыт, CHECKPOINT-02 пройден. ContactFormSheet создаёт/редактирует через общий CRM service, использует RHF/Zod onBlur и Sonner, Cmd/Ctrl+Enter/Escape. Non-modal Sheet сохраняет доступ к таблице и draft; фиксированная версия защищает от перезаписи. Финальные build/typecheck/diff-check прошли; `npm run check:crm` — 9/9 pass на настоящих HTTP/Auth/PostgreSQL. Браузер: таблица/сортировка/фильтр, pointer drag с reload, Activity detail, blur/toast/save/Escape/focus, READONLY/AGENT, CONFLICT/network/pending; один повторный shortcut дал одну запись и audit. Desktop/mobile 1440/390 px в обеих темах без overflow, reduced motion, свежая консоль без ошибок. Отчёты: [TASK-010.md](TASK-010.md), [CHECKPOINT-02.md](CHECKPOINT-02.md).
+
+## Актуальный статус TASK-009
+
+18 октября 2026: TASK-009 закрыт. `/crm/contacts/[id]` открывается из таблицы и напрямую: header/actions, composer и timeline пяти типов, Contact Info/Deals/Tags. Новая additive migration сохраняет tags; версия и audit проходят через общий CRM service. Финальные build/typecheck/diff-check прошли. На реальной PostgreSQL выполнены 33 HTTP/SQL проверки, включая tenant/RBAC, пагинацию, validation, stale version и audit rollback. В браузере проверены пять create-типов, edit/stage/assignment/tags, защищённое и успешное удаление, READONLY/AGENT, конфликт и commit-aware refresh. Обе темы на 1440/390 px, reduced motion, HTML как текст и финальная консоль без ошибок. Свои записи удалены, временный CHECK отсутствует, 3001/БД остановлены, explicit demo на 3000 восстановлен. Тестовые файлы не создавались. Отчёт: [TASK-009.md](TASK-009.md).
+
+## Актуальный статус TASK-008
+
+18 октября 2026: TASK-008 закрыт. `/crm/pipeline` — нормализованная воронка DndContext → 6 SortableContext → DealCard/useSortable. Финальные build/typecheck/diff-check прошли. На PostgreSQL проверены owner/latest Activity, точные Decimal, pointer/touch/keyboard drag, пустой этап, optimistic update, stale rollback, отказ audit, неизвестный сетевой результат и commit-aware refresh. READONLY/AGENT/чужие IDs проверены на сервере; pagination/empty и обе темы на desktop/mobile осмотрены. Исправлена мобильная прокрутка: document width=390 при viewport=390. Свежий переход без ошибок. Временные данные/constraint удалены, сервер 3001/БД остановлены, explicit demo на 3000 работает. Полный отчёт: [TASK-008.md](TASK-008.md).
+
+## Актуальный статус TASK-007
+
+18 октября 2026: TASK-007 закрыт. `/crm/contacts` получает initialData через Server Component и использует TanStack Table v8 с серверными фильтрами/пагинацией, debounce 300 ms и выбором по id/version между страницами. Build/typecheck и diff-check прошли; проверены 25 HTTP/SQL сценариев и лимит CSV 5000, tenant/RBAC, атомарность bulk/audit, браузерные поиск/выбор/назначение/удаление/CSV, loading/error/empty/retry и обе темы на desktop/mobile. Свежий финальный переход без ошибок. Временные данные удалены, проверочные сервер/БД остановлены. Explicit demo на 3000 работает; нормализованная таблица требует реального входа и PostgreSQL. Полный отчёт: [TASK-007.md](TASK-007.md).
+
+## Актуальный статус TASK-006
+
+18 октября 2026: TASK-006 закрыт. Typecheck/build прошли. Нормализованные CRM queries/actions проверены реальными HTTP Server Actions на PostgreSQL 17.10: роли/tenant isolation, фильтры/пагинация/Kanban, точные 20-значные копейки, stale version, конкурентный update и rollback при отказе audit insert. Совместимые Document действия прошли CRUD; CRM осмотрен на desktop/mobile. Новых тестовых файлов нет. Собственные временные записи/SQL-ограничение удалены, проверочный сервер/БД остановлены; explicit demo на 3000 работает. Подробности и границы: [TASK-006.md](TASK-006.md).
+
 ## Актуальный статус TASK-005 / CHECKPOINT-01
 
 18 октября 2026: TASK-005 закрыт, CHECKPOINT-01 пройден. Финальная production-сборка и строгий typecheck успешны. Проверены запуск, login page/вход в явное демо, dashboard, четыре группы/семь активных пунктов, collapse 248→80 px, persistence, 150 ms route fade, движущийся indicator, две темы/Header/Settings, mobile Sheet, focus trap/возврат фокуса и reduced motion. Поиск `#[0-9a-fA-F]` в src/components — 0 совпадений. Финальная консоль браузера без ошибок/предупреждений. Сервер доступен на 127.0.0.1:3000. Подробности: [TASK-005.md](TASK-005.md), [CHECKPOINT-01.md](CHECKPOINT-01.md).
