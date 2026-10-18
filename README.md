@@ -34,6 +34,14 @@ npm run dev
 
 Перезапустите сервер после изменения `.env`. Войдите через `/login` с заданными при инициализации учётными данными. Seed создаёт пустое пространство и администратора; повторный запуск сохраняет существующий пароль и данные. Удалите пароль bootstrap из окружения после инициализации. TASK-004 использует Auth.js v5 Credentials/JWT и проверяет активное членство на каждом запросе. Для внешнего production задайте AUTH_URL с HTTPS и устойчивый случайный AUTH_SECRET (например, через `npx auth secret`); cookie на HTTPS имеет Secure. После перехода со старой версии войдите заново.
 
+## Vercel
+
+Production-проект: `erp`, домен https://erp-xi-pink.vercel.app, GitHub `EsinencuP/ERP`, ветка `main`. Файловый demo для Vercel не используется. Нужны `DATABASE_URL` существующей Prisma Postgres интеграции, `ERP_DEMO_MODE=false`, устойчивый `AUTH_SECRET` и HTTPS `AUTH_URL` с production origin.
+
+`vercel.json` задаёт `npm run vercel-build`: Prisma Client, только в production — сохранённые `prisma migrate deploy`, затем Next.js build. Preview не мигрирует общую с production БД. Для первого bootstrap временно задать `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD`, `SEED_WORKSPACE_NAME`; после успешного входа удалить bootstrap-переменные и выполнить redeploy. Автоматический production bootstrap допускает только пустую базу либо уже существующий указанный аккаунт; пароль существующего аккаунта не меняется. Секреты/локальные credentials не коммитить.
+
+Проверка после деплоя: `/login`, Credentials-вход, authenticated `/api/health` с mode=postgresql, dashboard/contacts/pipeline и сохранение контакта с reload. Неавторизованный health возвращает 401 — это ожидаемая защита, а не сбой БД.
+
 ## Возможности
 
 - Общие формы React Hook Form + Zod, создание/изменение/удаление во всех пяти модулях.

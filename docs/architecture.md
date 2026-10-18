@@ -1,5 +1,9 @@
 # Архитектура Evo ERP
 
+## Vercel deployment
+
+Production использует существующий проект erp и Prisma Postgres через server-only DATABASE_URL. Локальный файловый demo не применяется на serverless filesystem. vercel.json запускает scripts/vercel-build.mjs: generate → только при VERCEL_ENV=production prisma migrate deploy → необязательный bootstrap из SEED_ADMIN_* → next build. Preview не выполняет миграции/seed, поскольку существующая интеграция использует общий DATABASE_URL для Production и Preview. Production требует AUTH_SECRET, HTTPS AUTH_URL и отключённый ERP_DEMO_MODE; bootstrap idempotent и не заменяет существующий пароль. После первого запуска bootstrap password удаляется из Vercel env. .vercel и локальные env/credentials исключены из Git; значения секретов не попадают в отчёты.
+
 ## Текущая версия
 
 Модульный монолит Next.js 15 App Router на Node.js. В одном приложении работают маршруты, Server Actions, бизнес-сервисы и репозиторий. PostgreSQL подключён через Prisma 6. Версии закреплены lock-файлом. Фронтенд: React, Tailwind 3, Shadcn/Radix, TanStack Table, React Hook Form + Zod, Recharts, DnD Kit. TASK-001 переводит шрифты на `Geist` и `Geist_Mono` из `next/font/google`.
