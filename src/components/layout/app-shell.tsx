@@ -14,9 +14,10 @@ import { EmptyState } from "@/components/ui/feedback";
 import { deleteSession } from "@/lib/auth-actions";
 import { dateLabel } from "@/lib/utils";
 import { modules } from "@/lib/modules";
-import type { SessionContext, WorkspaceState } from "@/types/shared";
+import type { Result, SessionContext, WorkspaceState } from "@/types/shared";
+import type { InventoryStockAlert } from "@/modules/inventory/types";
 
-type AppShellProps = { session: SessionContext; state: WorkspaceState; children: React.ReactNode; defaultSidebarOpen?: boolean };
+type AppShellProps = { session: SessionContext; state: WorkspaceState; inventoryAlert: Result<InventoryStockAlert> | null; children: React.ReactNode; defaultSidebarOpen?: boolean };
 
 /** Keep Sidebar state across route changes and hydrate its non-sensitive saved preference. */
 export function AppShell({ defaultSidebarOpen = true, ...props }: AppShellProps) {
@@ -24,7 +25,7 @@ export function AppShell({ defaultSidebarOpen = true, ...props }: AppShellProps)
 }
 
 /** Compose shared navigation, Header, route content and workspace dialogs. */
-function AppShellContent({ session, state, children }: AppShellProps) {
+function AppShellContent({ session, state, inventoryAlert, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const sidebar = useSidebar();
@@ -70,7 +71,7 @@ function AppShellContent({ session, state, children }: AppShellProps) {
   const projectCount = state.documents.filter((row) => row.domain === "projects" && row.data.status !== "Завершён").length;
 
   return <>
-    <AppSidebar pathname={pathname} session={session} projectCount={projectCount} onWorkspaceOpen={handleWorkspaceOpen} onSignOut={handleSignOut} />
+    <AppSidebar pathname={pathname} session={session} projectCount={projectCount} inventoryAlert={inventoryAlert} onWorkspaceOpen={handleWorkspaceOpen} onSignOut={handleSignOut} />
     <div className="min-w-0 flex-1">
       <AppHeader pathname={pathname} session={session} hasNotifications={state.events.length > 0} onSearchOpen={handleSearchOpen} onNotificationsOpen={handleNotificationsOpen} />
       <main id="main-content" className="mx-auto max-w-[1640px] px-5 pb-7 pt-6 sm:px-6 sm:pt-8 lg:px-8">

@@ -26,6 +26,22 @@
 
 **CHECKPOINT-02 — CRM TASK-006–010: ПРОЙДЕН.** Production build/typecheck, 9/9 интеграционных тестов и браузерные table/kanban/detail/forms/RBAC, обе темы и mobile: [CHECKPOINT-02.md](CHECKPOINT-02.md).
 
+**TASK-011 — Finance Invoice CRUD + PDF: ЗАКРЫТ.** Нормализованные счета, inline строки, точные суммы/налог, INV-YYYY-NNNN, workflow/платежи, tenant/RBAC/version/audit и PDF с кириллицей: [TASK-011.md](TASK-011.md).
+
+**TASK-012 — Finance Payments + Dashboard KPIs: ЗАКРЫТ.** Реестр/запись нормализованных платежей, четыре KPI, Line/Donut/HorizontalBar, AR aging, отдельные валюты и Promise.all: [TASK-012.md](TASK-012.md).
+
+**TASK-013 — Finance Expenses: ЗАКРЫТ.** Expense/ExpenseCategory, точные суммы, CRUD на `/finance/expenses`, категории/поиск/валюта/пагинация, ссылка на чек и tenant/RBAC/version/audit: [TASK-013.md](TASK-013.md).
+
+**TASK-014 — Finance P&L Reports: ЗАКРЫТ.** `/finance/reports`, Revenue по полной оплате − Expenses = Net Profit, календарные периоды/Custom, отдельные валюты и защищённый CSV API: [TASK-014.md](TASK-014.md).
+
+**TASK-015 — Inventory Products + Stock Levels: ЗАКРЫТ.** Нормализованный каталог, категории, точные multi-warehouse totals/MinStock/status, CRUD и low/zero stock sidebar badge: [TASK-015.md](TASK-015.md).
+
+**TASK-016 — Inventory Stock Movements + Warehouses: ЗАКРЫТ.** Warehouse CRUD, IN/OUT/ADJUSTMENT/TRANSFER, атомарные versioned balances, immutable ledger и timeline товара: [TASK-016.md](TASK-016.md).
+
+**TASK-017 — Inventory Dashboard + Low Stock Alerts: ЗАКРЫТ.** Четыре KPI, точная стоимость по валютам, таблица пополнения и Reorder suggested: [TASK-017.md](TASK-017.md).
+
+**CHECKPOINT-03 — Finance + Inventory TASK-011–TASK-017: ПРОЙДЕН.** Production build/tsc, 9/9 интеграций, Invoice/PDF/KPI/P&L/stock/immutable ledger и браузер: [CHECKPOINT-03.md](CHECKPOINT-03.md).
+
 Другие задания пользователя пока не закрывались. Нумерация остальных пунктов ниже — предварительная очередь развития ранее созданного каркаса, а не подтверждённое завершение будущих пользовательских задач.
 
 ## Текущий этап — запускаемый ERP Template
@@ -40,6 +56,13 @@
 - TASK-008: нормализованная воронка Deal на DnD Kit с шестью этапами, пагинацией каждой колонки, optimistic update и безопасным rollback.
 - TASK-009: отдельная карточка контакта, добавление и история Activity, связанные сделки и редактируемые теги.
 - TASK-010: общие create/edit Contact forms в неблокирующей Sheet с blur validation, shortcuts и toast.
+- TASK-011: Invoice CRUD на `/finance`, строки/налоги, нумерация, платежи, workflow и защищённый PDF; прежний реестр сохранён в `/finance/documents`.
+- TASK-012: `/finance/payments`, нормализованные финансовые KPI/графики/aging на dashboard, точный CSV и параллельные запросы.
+- TASK-013: `/finance/expenses`, нормализованные расходы с категориями, формой/карточкой и серверной таблицей; receipt как HTTP(S)-ссылка.
+- TASK-014: `/finance/reports`, точный paid-invoice P&L, периоды по Москве, категории расходов и `/api/reports/export?type=pnl&from=...&to=...`.
+- TASK-015: `/inventory`, Product/category, точные остатки по всем складам, per-product thresholds/status и sidebar alerts.
+- TASK-016: `/inventory/warehouses`, `/inventory/[id]`, неизменяемые движения, атомарные переносы и журнал по товару.
+- TASK-017: `/inventory/dashboard`, глобальные active-product KPI, стоимость по валютам и low/zero-stock список пополнения.
 
 Реализованы исходники, миграция и bootstrap; фактические результаты проверок фиксируются в `verification.md`.
 
@@ -59,9 +82,9 @@
 
 - Без номера: управление участниками, безопасный workspace switch, отдельные права на HR/зарплату.
 - Без номера: rate limiting и блокировки входа, восстановление пароля, управление сессиями.
-- Без номера: перевод прежней таблицы сделок на нормализованную модель/пагинацию, серверная пагинация остальных модулей, SQL dashboard aggregation, ограничения объёмов.
-- Без номера: строки счёта, налоги, Payment allocations, возвраты и бухгалтерский ledger.
-- TASK-011: склады, movements/reservations и транзакционные остатки.
-- TASK-012: кадровые документы, отпуска и payroll по требованиям бизнеса.
-- TASK-013: event outbox, workflow engine, пользовательские DocType.
+- Без номера: перевод прежней таблицы сделок на нормализованную модель/пагинацию, серверная пагинация остальных модулей, SQL aggregation остальных operational-модулей, ограничения объёмов.
+- Без номера: Payment allocations, налоговый учёт, возвраты и бухгалтерский ledger.
+- Без номера: резервы, партии и оценка запасов; склады/движения и транзакционные остатки реализованы TASK-016.
+- Без номера: кадровые документы, отпуска и payroll по требованиям бизнеса (предварительный номер TASK-012 заменён пользовательской задачей Finance Payments).
+- Без номера: event outbox, workflow engine, пользовательские DocType (предварительный номер TASK-013 заменён пользовательской задачей Finance Expenses).
 - CHECKPOINT-002: доменные интеграционные проверки, нагрузка и восстановление из backup.

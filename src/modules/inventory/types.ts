@@ -1,6 +1,23 @@
 import type { z } from "zod";
 import type { schema } from "./schema";
-import type { DocumentRecord } from "@/types/shared";
+import type { DocumentRecord, PaginatedResponse } from "@/types/shared";
 
 export type ProductData = z.infer<typeof schema>;
-export type Product = Omit<DocumentRecord, "domain" | "data"> & { domain: "inventory"; data: ProductData };
+export type ProductDocument = Omit<DocumentRecord, "domain" | "data"> & { domain: "inventory"; data: ProductData };
+export type StockStatus = typeof import("./schema").STOCK_STATUSES[number];
+export type ProductInput = z.input<typeof import("./schema").productSchema>;
+export type ProductFilters = z.input<typeof import("./schema").productFiltersSchema>;
+export type Product = { id: string; workspaceId: string; sku: string; name: string; category: string | null; description: string | null; unit: string; currency: string; salePrice: string; costPrice: string; minStock: string; stock: string; stockStatus: StockStatus; isActive: boolean; version: number; createdAt: string; updatedAt: string };
+export type InventoryStockAlert = { lowStock: number; outOfStock: number; total: number };
+export type WarehouseInput = z.input<typeof import("./schema").warehouseSchema>;
+export type WarehouseFilters = z.input<typeof import("./schema").warehouseFiltersSchema>;
+export type Warehouse = { id: string; workspaceId: string; code: string; name: string; address: string | null; isActive: boolean; version: number; createdAt: string; updatedAt: string };
+export type MovementKind = typeof import("./schema").MOVEMENT_KINDS[number];
+export type StockMovementInput = z.input<typeof import("./schema").stockMovementSchema>;
+export type MovementFilters = z.input<typeof import("./schema").movementFiltersSchema>;
+export type StockPosition = { productId: string; warehouseId: string; warehouseName: string; warehouseCode: string; warehouseActive: boolean; qty: string; version: number };
+export type StockMovement = { id: string; workspaceId: string; productId: string; warehouseId: string; warehouseName: string; warehouseCode: string; type: "IN" | "OUT" | "ADJUSTMENT" | "TRANSFER_IN" | "TRANSFER_OUT"; quantity: string; qtyBefore: string; qtyAfter: string; transferId: string | null; reference: string | null; notes: string | null; createdById: string | null; createdAt: string };
+export type StockMovementReceipt = { transferId: string | null; movements: StockMovement[] };
+export type ProductInventory = { product: Product; ledger: PaginatedResponse<StockMovement>; positions: PaginatedResponse<StockPosition> };
+export type InventoryDashboardFilters = z.input<typeof import("./schema").inventoryDashboardFiltersSchema>;
+export type InventoryDashboardData = { asOf: string; kpis: { totalProducts: number; lowStockCount: number; outOfStock: number; totalValues: { currency: string; amount: string }[] }; alerts: PaginatedResponse<Product> };

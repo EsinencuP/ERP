@@ -36,8 +36,9 @@ export function formatDate(date: string | Date | number, format = "dd.MM.yyyy"):
   } catch { return "—"; }
 }
 
-/** Generate an opaque UUID with an optional trusted prefix; call outside render in secure contexts. */
-export function generateId(prefix = ""): string {
+/** Generate an opaque UUID, or format a server-allocated yearly sequence without allocating it here. */
+export function generateId(prefix = "", sequence?: { year: number; value: number }): string {
+  if (sequence) return `${prefix}-${String(sequence.year).padStart(4, "0")}-${String(sequence.value).padStart(4, "0")}`;
   const id = globalThis.crypto.randomUUID();
   return prefix ? `${prefix}_${id}` : id;
 }

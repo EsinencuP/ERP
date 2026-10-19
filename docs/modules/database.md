@@ -69,12 +69,14 @@ TASK-004 сохраняет passwordHash/scrypt, переводит cookie на 
 
 ## INVENTORY
 
-- `Product`: уникальный SKU в workspace, название, единица, costPrice/salePrice, minStock, currency и isActive. Деньги — Decimal(20,0); minStock — Decimal(20,3).
+- `Product`: уникальный SKU в workspace, название, nullable category VARCHAR(100) (TASK-015), единица, costPrice/salePrice, minStock, currency и isActive. Деньги — Decimal(20,0); minStock — Decimal(20,3). Миграция `20261019000200_inventory_product_category` добавляет только category и индекс workspace/category, сохраняя существующие строки.
 - `Warehouse`: уникальный code в workspace, название, адрес, isActive.
 - `StockItem`: один остаток qty для `(workspaceId, productId, warehouseId)`. Product и Warehouse обязаны принадлежать тому же workspace. Остаток неотрицателен.
 - `StockMovement`: относится к StockItem, хранит type, signed quantity, qtyBefore/qtyAfter, nullable creator, transferId/reference. CHECK проверяет `qtyAfter = qtyBefore + quantity`, неотрицательные балансы и знак движения. IN/TRANSFER_IN — плюс, OUT/TRANSFER_OUT — минус, ADJUSTMENT — любая ненулевая дельта.
 
 Перемещение между складами — две записи TRANSFER_OUT/TRANSFER_IN с общим transferId. CHECK требует transferId только для этих типов. Парность, один Product, сохранение общего количества и атомарное обновление двух StockItem должны обеспечиваться сервисом, не одним SQL CHECK.
+
+TASK-016: Serializable movement service реализует атомарные позиции/ledger/audit. Миграция `20261019000300_immutable_stock_ledger` дополнительно создаёт `stock_movement_immutable` (BEFORE UPDATE/DELETE) и deferred `stock_transfer_pair` (AFTER INSERT, проверка transfer pair к commit). Журнал исправляется новыми entries. SQL functions/triggers не представлены Prisma schema и сохраняются миграциями; read-only schema diff не проверяет их бизнес-поведение.
 
 ## HR
 
@@ -140,3 +142,19 @@ CHECK-ограничения находятся в SQL миграции: Prisma 
 Contact update/delete и Deal stage update включают version в WHERE и увеличивают её при обновлении. Serializable-транзакция объединяет чтение, проверки, мутацию и AuditLog с JSON before/after. Restrict сохраняет контакт, если он используется. Пагинация/группировка читается через RepeatableRead. Денежные суммы поступают в Prisma.Decimal без округления и выходят строками. Новые таблицы/миграции этой задачей не добавляются. Переходные Document-записи не копируются в нормализованные таблицы автоматически.
 
 TASK-009: Contact.tags — PostgreSQL TEXT[] с default [] и CHECK на non-null array, отсутствие null-элементов и максимум 20 значений. Миграция 20261018084403_contact_detail_tags добавляет только поле/constraint внутри BEGIN/COMMIT, существующие контакты получают []. Zod дополнительно требует trimmed непустые строки до 32 символов и отсутствие повторов без учёта регистра. Изменение tags использует version и тот же атомарный AuditLog, что остальные поля Contact. Лента detail читает Activity/Deal только после tenant-scoped проверки родителя; count и страницы согласованы RepeatableRead.
+
+
+## TASK-011 — Invoice aggregate и нумератор
+
+Миграция `20261018094007_invoice_crud_pdf` добавляет nullable Invoice.customerSnapshot (Json) и issuerName, не меняя существующие денежные единицы или FK. Snapshot name/company/email/address сохраняется при создании/правке черновика; выданный счёт не изменяется вместе с Contact. Старые строки без snapshot читаются через связь.
+
+InvoiceSequence имеет составной PK (workspaceId, year), value Int, FK Workspace с Restrict и SQL CHECK year 1–9999/value 0–999999999. Миграция заполняет счётчики максимальным suffix существующих INV-YYYY-NNNN (4–9 цифр), не перенумеровывает документы. Создание sequence/increment, Invoice, InvoiceItem и AuditLog выполняется атомарно в Serializable. Удаление draft не удаляет sequence.
+
+Invoice → InvoiceItem/Payment сохраняет составные tenant FK. Вложенный create строк наследует workspaceId от родителя Prisma; строки заменяются целиком только в DRAFT под версией родительского Invoice. Payment, новая версия/статус и AuditLog атомарны. PAID получается из суммы платежей; OVERDUE вычисляется при чтении. PARTIALLY_PAID остаётся в enum для совместимости, новый сервис его не присваивает. Подробная политика округления и переходов — [finance.md](finance.md).
+
+
+## TASK-013 — Expense
+
+Additive migration `20261019000100_finance_expenses` создаёт ExpenseCategory (OFFICE/SOFTWARE/TRAVEL/MARKETING/EQUIPMENT/RENT/UTILITIES/OTHER) и Expense: title VARCHAR(200), amount Decimal(20,0) в целых копейках, currency CHAR(3), category enum, DATE date, nullable receipt VARCHAR(2048)/notes, version и audit timestamps. Expense.workspaceId → Workspace Restrict; (createdById, workspaceId) → Membership(userId, workspaceId) Restrict. Уникальный (id, workspaceId), индексы workspace/date/createdAt/id, workspace/category/date и workspace/creator.
+
+CHECK в SQL, не заменяемые Prisma schema: title не пуст, amount/version >0, RUB/USD/EUR, date 0001–9999, notes до 10000, nullable canonical http(s) receipt без credentials/пробелов. Серверная Zod-проверка URL строже и нормализует URL. Каждый update/delete сверяет version; Expense и AuditLog Expense before/after записываются атомарно. Данные существующих таблиц не переносятся и не изменяются миграцией.

@@ -58,6 +58,17 @@ enum PaymentMethod {
   OTHER
 }
 
+enum ExpenseCategory {
+  OFFICE
+  SOFTWARE
+  TRAVEL
+  MARKETING
+  EQUIPMENT
+  RENT
+  UTILITIES
+  OTHER
+}
+
 enum MovementType {
   IN
   OUT
@@ -124,8 +135,10 @@ model Workspace {
   deals            Deal[]
   activities       Activity[]
   invoices         Invoice[]
+  invoiceSequences InvoiceSequence[]
   invoiceItems     InvoiceItem[]
   payments         Payment[]
+  expenses         Expense[]
   products         Product[]
   warehouses       Warehouse[]
   stockItems       StockItem[]
@@ -169,6 +182,7 @@ model Membership {
   assignedActivities Activity[]      @relation("ActivityAssignee")
   createdInvoices    Invoice[]       @relation("InvoiceCreator")
   receivedPayments   Payment[]       @relation("PaymentReceiver")
+  createdExpenses    Expense[]       @relation("ExpenseCreator")
   stockMovements     StockMovement[] @relation("StockMovementCreator")
   employee           Employee?       @relation("EmployeeMember")
   approvedLeaves     Leave[]         @relation("LeaveApprover")
@@ -317,6 +331,8 @@ model Invoice {
   issueDate   DateTime      @default(now()) @db.Date
   dueDate     DateTime      @db.Date
   notes       String?
+  customerSnapshot Json?
+  issuerName String?
   version     Int           @default(1)
   createdAt   DateTime      @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
@@ -335,6 +351,15 @@ model Invoice {
   @@index([workspaceId, dealId])
   @@index([workspaceId, projectId])
   @@index([workspaceId, createdById])
+}
+
+// Persistent per-workspace/year numbering survives draft deletion.
+model InvoiceSequence {
+  workspaceId String
+  year Int
+  value Int @default(0)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  @@id([workspaceId, year])
 }
 
 model InvoiceItem {
@@ -384,12 +409,37 @@ model Payment {
   @@map("invoice_payments")
 }
 
+// Finance expenses are workspace-owned and store exact integer minor units.
+model Expense {
+  id          String          @id @default(cuid())
+  workspaceId String
+  createdById String?
+  title       String          @db.VarChar(200)
+  amount      Decimal         @db.Decimal(20, 0)
+  currency    String          @default("RUB") @db.Char(3)
+  category    ExpenseCategory  @default(OTHER)
+  date        DateTime        @db.Date
+  receipt     String?         @db.VarChar(2048)
+  notes       String?
+  version     Int             @default(1)
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime        @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  createdBy   Membership?     @relation("ExpenseCreator", fields: [createdById, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, date, createdAt, id])
+  @@index([workspaceId, category, date])
+  @@index([workspaceId, createdById])
+}
+
 // Inventory. One exact stock balance per product and warehouse.
 model Product {
   id           String        @id @default(cuid())
   workspaceId  String
   sku          String        @db.VarChar(64)
   name         String
+  category     String?       @db.VarChar(100)
   description  String?
   unit         String        @default("pcs") @db.VarChar(32)
   currency     String        @default("RUB") @db.Char(3)
@@ -407,6 +457,7 @@ model Product {
   @@unique([id, workspaceId])
   @@unique([workspaceId, sku])
   @@index([workspaceId, isActive, name])
+  @@index([workspaceId, category])
 }
 
 model Warehouse {

@@ -1,5 +1,29 @@
 # Проверки реализации
 
+## Актуальный статус TASK-017 / CHECKPOINT-03
+
+19 октября 2026: TASK-017 закрыт, CHECKPOINT-03 пройден. `/inventory/dashboard`: четыре KPI и Reorder suggested для low/zero stock, отдельные точные валютные суммы. Финальные build и npx tsc --noEmit успешны; Prisma validate/status/diff — 8 миграций, без различий. `npm run check:finance-inventory` — 9/9 pass на production HTTP/Auth/PostgreSQL: Invoice CRUD/PDF, платежи, Finance KPI/P&L/expenses/CSV, stock/warehouse/ledger/concurrency/audit/RBAC. Браузер: dark/light, 390 px, filters/empty/readonly/foreign, reduced motion, Refresh/sidebar после IN. При остановке БД STORAGE без data/fallback, карточки и таблица убраны. Fixtures удалены, triggers включены, cookies очищены, серверы остановлены. Отчёты: [TASK-017.md](TASK-017.md), [CHECKPOINT-03.md](CHECKPOINT-03.md).
+
+## Актуальный статус TASK-015 / TASK-016
+
+19 октября 2026: TASK-015 и TASK-016 закрыты. Нормализованный Product catalog/category, exact stock totals/status/MinStock/sidebar alert, Warehouse CRUD, immutable StockMovement и timeline по товару. Миграции category и SQL immutable/transfer triggers применены к изолированной PostgreSQL 17.10; repeated deploy/status/validate/schema diff прошли. Финальные build/strict typecheck/diff-check успешны. HTTP/SQL проверили границы/большие количества, tenant/RBAC/strict schema/version/concurrency, отсутствие отрицательного запаса/overflow, paired transfer conservation, audit rollback и DB update/delete/pair constraints. UI CRUD, четыре типа движений, filters/pages, readonly/foreign, keyboard/focus, обе темы и mobile 390 px проверены. Badge подтверждён при 104 alerts (99+), collapsed/mobile и network error/recovery. Нормальные переходы без console errors; при отказе PostgreSQL STORAGE без data/демо и без старого ledger. Совместные fixtures удалены, оба SQL triggers включены, серверы остановлены. Файлов тестов вне CHECKPOINT нет. CHECKPOINT-03 остаётся после TASK-017. Отчёты: [TASK-015.md](TASK-015.md), [TASK-016.md](TASK-016.md).
+
+## Актуальный статус TASK-014
+
+19 октября 2026: TASK-014 закрыт. `/finance/reports`: Revenue по полностью оплаченным счетам на дату окончательной оплаты − Expenses = Net Profit; This Month/Quarter/Year/Custom по Москве, RUB/USD/EUR отдельно, категории и защищённый CSV `/api/reports/export`. Build/strict typecheck/diff-check прошли. HTTP/SQL подтвердили формулу, Moscow boundaries, исключение partial/DRAFT/CANCELLED/future, точные большие суммы и отрицательную прибыль, tenant/live RBAC, CSV headers/BOM/sign/strict query и свежесть после Expense mutation. Браузер: periods/validation/Enter/export, обе темы, mobile 390 px, empty/readonly; консоль обычных переходов без ошибок. При отказе PostgreSQL KPI убраны, CSV 503/STORAGE без fallback. Собственные fixtures удалены, серверы остановлены. Тестовых файлов вне CHECKPOINT нет. CHECKPOINT-03 остаётся после TASK-017. Отчёт: [TASK-014.md](TASK-014.md).
+
+## Актуальный статус TASK-013
+
+19 октября 2026: TASK-013 закрыт. Expense/ExpenseCategory и additive PostgreSQL migration, `/finance/expenses` с CRUD, категориями, поиском, валютой и пагинацией; receipt — проверенная HTTP(S)-ссылка. Финальные build/strict typecheck/diff-check успешны. Prisma validate/deploy/status и diff БД к схеме прошли. HTTP/SQL подтвердили точные суммы, tenant/RBAC/version, concurrent update и полный rollback при отказе audit; invoice/payment regression прошла. Браузерные CRUD/filters/pages/roles, keyboard/focus, обе темы и mobile 390 px проверены. При остановленной PostgreSQL — ошибка без демофолбэка. Собственные fixtures удалены, проверочные серверы остановлены. Тестовых файлов вне CHECKPOINT нет. Отчёт: [TASK-013.md](TASK-013.md).
+
+## Актуальный статус TASK-012
+
+18 октября 2026: TASK-012 закрыт. Финансовые KPI и три Recharts-графика на `/` используют нормализованные Invoice/Payment через Promise.all; добавлены currency switch, AR aging и `/finance/payments` с фильтрами/записью оплаты. Финальные build/typecheck/diff-check прошли. HTTP/SQL проверили formulas, UTC month/aging boundaries, tenant/RBAC, точные большие суммы, pagination/filter/export; UI payment 2005 коп. дал одну запись/audit и обновил все четыре KPI. Dark/light и mobile 390 px без общего overflow, Line keyboard tooltip и нормальные переходы без console errors. При остановке PostgreSQL — STORAGE без demo/нулей. Собственные fixtures удалены, проверочные серверы остановлены. Тестовых файлов вне CHECKPOINT нет. Отчёт: [TASK-012.md](TASK-012.md).
+
+## Актуальный статус TASK-011
+
+18 октября 2026: TASK-011 закрыт. Invoice CRUD, inline строки, точные копейки/налог, INV-YYYY-NNNN, workflow/платежи и защищённый PDF на статическом Geist. Финальные build/typecheck/diff-check успешны; Prisma validate/status корректны на локальной PostgreSQL 17.10. HTTP/SQL подтвердили tenant/RBAC/version, запрет подмены total/status, дубликатов/переплаты и изменение оплаченных счетов. Браузер: create/edit/send/partial/full payment/reload/delete, поиск/фильтр/empty, Ctrl+Enter/Escape, обе темы и mobile 390 px без общего overflow, свежая консоль без ошибок. Poppler/pypdf: PDF с кириллицей, обычный и 100-строчный (17 страниц), все footer/последняя строка сохранены. Тестовых файлов вне CHECKPOINT нет. Отчёт: [TASK-011.md](TASK-011.md).
+
 ## Vercel deployment
 
 18 октября 2026: актуальный код опубликован из GitHub в существующий Vercel project erp. Устранён старый build failure без root layout; Prisma Postgres мигрирована, настроены production auth и первый ADMIN, bootstrap-пароль удалён из env. HTTPS login, защищённый health postgresql, восемь основных страниц и Contact create/read/update/filter/delete проверены реальными запросами; smoke contact удалён, аудит сохранён. Отчёт: [DEPLOYMENT.md](DEPLOYMENT.md).

@@ -8,8 +8,8 @@ import type { DocumentRecord, Domain, Result } from "@/types/shared";
 type ModuleActions = { create: (input: unknown) => Promise<Result<DocumentRecord>>; update: (id: string, version: number, input: unknown) => Promise<Result<DocumentRecord>>; delete: (id: string, version: number) => Promise<Result<DocumentRecord>> };
 export const actions: Record<Domain, ModuleActions> = {
   crm: { create: crm.createDealDocument, update: crm.updateDealDocument, delete: crm.deleteDealDocument },
-  finance: { create: finance.createInvoice, update: finance.updateInvoice, delete: finance.deleteInvoice },
-  inventory: { create: inventory.createProduct, update: inventory.updateProduct, delete: inventory.deleteProduct },
+  finance: { create: finance.createInvoiceDocument, update: finance.updateInvoiceDocument, delete: finance.deleteInvoiceDocument },
+  inventory: { create: inventory.createProductDocument, update: inventory.updateProductDocument, delete: inventory.deleteProductDocument },
   hr: { create: hr.createEmployee, update: hr.updateEmployee, delete: hr.deleteEmployee },
   projects: { create: projects.createProject, update: projects.updateProject, delete: projects.deleteProject },
 };
