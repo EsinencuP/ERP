@@ -1,4 +1,6 @@
 "use client"
+import { useI18n } from "@/i18n/use-i18n";
+
 
 import * as React from "react"
 import {
@@ -7,7 +9,7 @@ import {
   ChevronRightIcon,
 } from "lucide-react"
 import { DayButton, DayPicker, getDefaultClassNames } from "react-day-picker"
-import { ru } from "date-fns/locale"
+import { enUS, ru } from "date-fns/locale"
 
 import { cn } from "@/lib/utils"
 import { Button, buttonVariants } from "@/components/ui/button"
@@ -19,7 +21,7 @@ function Calendar({
   showOutsideDays = true,
   captionLayout = "label",
   buttonVariant = "ghost",
-  locale = ru,
+  locale,
   labels,
   formatters,
   components,
@@ -27,12 +29,14 @@ function Calendar({
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"]
 }) {
+  const { t, locale: uiLocale, localeTag: uiLocaleTag } = useI18n();
+
   const defaultClassNames = getDefaultClassNames()
 
   return (
     <DayPicker
-      locale={locale}
-      labels={{ labelNav: () => "Навигация по календарю", labelPrevious: () => "Предыдущий месяц", labelNext: () => "Следующий месяц", labelDayButton: (date, modifiers) => `${modifiers.today ? "Сегодня, " : ""}${date.toLocaleDateString("ru-RU", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}${modifiers.selected ? ", выбрано" : ""}`, ...labels }}
+      locale={locale ?? (uiLocale === "ru" ? ru : enUS)}
+      labels={{ labelNav: () => t("Навигация по календарю"), labelPrevious: () => t("Предыдущий месяц"), labelNext: () => t("Следующий месяц"), labelDayButton: (date, modifiers) => `${modifiers.today ? t("Сегодня, ") : ""}${date.toLocaleDateString(uiLocaleTag, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}${modifiers.selected ? t(", выбрано") : ""}`, ...labels }}
       showOutsideDays={showOutsideDays}
       className={cn("motion-fade",
         "bg-background group/calendar p-3 [--cell-size:2rem] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent",
@@ -43,7 +47,7 @@ function Calendar({
       captionLayout={captionLayout}
       formatters={{
         formatMonthDropdown: (date) =>
-          date.toLocaleString("default", { month: "short" }),
+          date.toLocaleString(uiLocaleTag, { month: "short" }),
         ...formatters,
       }}
       classNames={{

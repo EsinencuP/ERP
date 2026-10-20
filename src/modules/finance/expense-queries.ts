@@ -16,10 +16,12 @@ export async function getExpenses(filters: ExpenseFilters = {}): Promise<Result<
   const data = parsed.data;
   const where: Prisma.ExpenseWhereInput = {
     workspaceId: context.data.workspaceId,
+    ...(data.projectId ? { projectId: data.projectId } : {}),
     ...(data.category ? { category: data.category } : {}), ...(data.currency ? { currency: data.currency } : {}),
     ...(data.search ? { OR: [{ title: { contains: data.search, mode: "insensitive" } }, { notes: { contains: data.search, mode: "insensitive" } }] } : {}),
   };
   try {
+    if (data.projectId && !await db.project.findUnique({ where: { id_workspaceId: { id: data.projectId, workspaceId: context.data.workspaceId } }, select: { id: true } })) return err("NOT_FOUND", "Проект не найден");
     const [rows, total] = await Promise.all([
       db.expense.findMany({ where, orderBy: [{ date: "desc" }, { createdAt: "desc" }, { id: "asc" }], skip: (data.page - 1) * data.pageSize, take: data.pageSize }),
       db.expense.count({ where }),

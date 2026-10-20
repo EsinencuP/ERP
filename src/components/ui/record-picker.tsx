@@ -1,0 +1,19 @@
+"use client";
+import { useI18n } from "@/i18n/use-i18n";
+
+import { useEffect, useId, useState } from "react";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import type { PaginatedResponse, Result } from "@/types/shared";
+import { Button } from "./button";
+import { Input } from "./input";
+import { Popover, PopoverContent, PopoverTrigger } from "./popover";
+
+/** Pick one server-scoped record with bounded search, pagination and an explicit empty selection. */
+export function RecordPicker<T extends { id: string; name: string }>({ label, selected, onSelect, load, disabled = false, emptyLabel = "Не выбран" }: { label: string; selected: T | null; onSelect: (value: T | null) => void; load: (filters: { search?: string; page?: number }) => Promise<Result<PaginatedResponse<T>>>; disabled?: boolean; emptyLabel?: string }) {
+  const { t } = useI18n();
+
+  const id = useId(), [open, setOpen] = useState(false), [search, setSearch] = useState(""), query = useDebouncedValue(search), [page, setPage] = useState(1), [data, setData] = useState<Result<PaginatedResponse<T>> | null>(null);
+  useEffect(() => { if (!open) return; let alive = true; setData(null); load({ search: query, page }).then((value) => { if (!alive) return; if (value.ok && page > Math.max(1, value.data.totalPages)) { setPage(Math.max(1, value.data.totalPages)); return; } setData(value); }).catch(() => { if (alive) setData({ ok: false, error: { code: "STORAGE", message: t("Не удалось загрузить варианты") } }); }); return () => { alive = false; }; }, [query, page, open, load]);
+  return <div className="motion-fade min-w-0 space-y-2"><label htmlFor={id} className="block text-xs font-medium">{t(label)}</label><Popover open={open} onOpenChange={setOpen}><PopoverTrigger asChild><Button type="button" id={id} variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between text-left font-normal" disabled={disabled}><span className="truncate">{selected?.name ?? t(emptyLabel)}</span><ChevronsUpDown className="size-3 shrink-0" /></Button></PopoverTrigger><PopoverContent aria-label={t(label)} className="motion-fade w-80 max-w-[calc(100vw-2rem)] p-3" align="start"><label htmlFor={`${id}-search`} className="sr-only">{t("Поиск: ")}{t(label)}</label><Input id={`${id}-search`} type="search" maxLength={200} placeholder={t("Поиск по названию")} value={search} onChange={function handleSearch(event) { setSearch(event.target.value); setPage(1); }} /><Button type="button" variant="ghost" className="mt-2 w-full justify-start" onClick={function handleClear() { onSelect(null); setOpen(false); }}>{t(emptyLabel)}</Button><div role="status" className="my-2 text-xs text-muted-foreground">{!data || search !== query ? t("Загрузка…") : !data.ok ? t(data.error.message) : t`Найдено: ${data.data.total}`}</div>{data?.ok && search === query && <><ul aria-label={t`Варианты: ${t(label)}`} className="max-h-52 overflow-y-auto">{data.data.data.map((row) => <li key={row.id}><Button type="button" variant="ghost" className="h-auto min-h-9 w-full justify-between text-left" aria-pressed={selected?.id === row.id} onClick={function handleSelect() { onSelect(row); setOpen(false); }}><span className="min-w-0 break-words">{row.name}</span>{selected?.id === row.id && <Check className="size-3 shrink-0" />}</Button></li>)}</ul>{data.data.totalPages > 1 && <div className="mt-2 flex items-center justify-between gap-2 border-t pt-2"><Button type="button" size="sm" variant="outline" disabled={page <= 1} onClick={function handlePrevious() { setPage((value) => value - 1); }}>{t("Назад")}</Button><span className="text-xs">{page} / {data.data.totalPages}</span><Button type="button" size="sm" variant="outline" disabled={page >= data.data.totalPages} onClick={function handleNext() { setPage((value) => value + 1); }}>{t("Далее")}</Button></div>}</>}</PopoverContent></Popover></div>;
+}

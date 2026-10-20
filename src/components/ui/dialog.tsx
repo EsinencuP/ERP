@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "@/i18n/use-i18n";
+
 
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
@@ -26,5 +28,7 @@ export function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLD
 
 /** Radix modal with focus trapping, escape handling and a labelled close control. */
 export function DialogContent({ children, className, ...props }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>) {
-  return <DialogPrimitive.Portal><DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[hsl(var(--color-overlay))] backdrop-blur-sm" style={{ animation: "overlay-in 150ms ease-out" }} /><DialogPrimitive.Content className={cn("fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-[hsl(var(--color-surface))] p-6 shadow-2xl", className)} {...props}>{children}<DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1.5 text-[hsl(var(--color-muted))] hover:bg-[hsl(var(--color-hover))]" aria-label="Закрыть"><X className="size-4" /></DialogPrimitive.Close></DialogPrimitive.Content></DialogPrimitive.Portal>;
+  const { t } = useI18n();
+
+  return <DialogPrimitive.Portal><DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-[hsl(var(--color-overlay))] backdrop-blur-sm" style={{ animation: "overlay-in 150ms ease-out" }} /><DialogPrimitive.Content className={cn("fixed left-1/2 top-1/2 z-50 max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl border bg-[hsl(var(--color-surface))] p-6 shadow-2xl", className)} {...props}>{children}<DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1.5 text-[hsl(var(--color-muted))] hover:bg-[hsl(var(--color-hover))]" aria-label={t("Закрыть")}><X className="size-4" /></DialogPrimitive.Close></DialogPrimitive.Content></DialogPrimitive.Portal>;
 }

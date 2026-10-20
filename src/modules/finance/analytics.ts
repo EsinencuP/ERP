@@ -1,3 +1,5 @@
+import { getI18n } from "@/i18n/server";
+import { INVOICE_STATUS_LABELS } from "./presentation";
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -82,14 +84,15 @@ export async function getFinanceExport(currency: FinanceCurrency = "RUB"): Promi
   if (!hasPermission(context.data.role, "canExport")) return err("FORBIDDEN", "Нет права на экспорт финансового отчёта");
   const result = await getFinanceDashboard(currency); if (!result.ok) return result;
   const data = result.data;
+  const { t } = await getI18n();
   return ok([
-    ["Валюта", data.currency], ["Сформирован (UTC)", data.asOf], ["Показатель", `Сумма, ${data.currency}`],
-    ["Total Revenue", invoicePriceInput(data.kpis.totalRevenue)], ["Outstanding", invoicePriceInput(data.kpis.outstanding)],
-    ["Paid MTD", invoicePriceInput(data.kpis.paidMtd)], ["Overdue", invoicePriceInput(data.kpis.overdue)], [],
-    ["Месяц", `Поступления, ${data.currency}`], ...data.revenue.map((row) => [row.month, invoicePriceInput(row.amount)]), [],
-    ["Статус", "Количество счетов"], ...data.statuses.map((row) => [row.status, row.count]), [],
-    ["Клиент", `Поступления, ${data.currency}`], ...data.topClients.map((row) => [row.name, invoicePriceInput(row.amount)]), [],
-    ["Дней после срока оплаты", `Остаток, ${data.currency}`, "Количество счетов"],
-    ...data.aging.map((row) => [["В срок", "1–30", "31–60", "61–90", "Более 90"][row.bucket] ?? "", invoicePriceInput(row.amount), row.count]),
+    [t("Валюта"), data.currency], [t("Сформирован (UTC)"), data.asOf], [t("Показатель"), t`Сумма, ${data.currency}`],
+    [t("Dashboard Revenue"), invoicePriceInput(data.kpis.totalRevenue)], [t("Outstanding"), invoicePriceInput(data.kpis.outstanding)],
+    [t("Paid MTD"), invoicePriceInput(data.kpis.paidMtd)], [t("Overdue"), invoicePriceInput(data.kpis.overdue)], [],
+    [t("Месяц"), t`Поступления, ${data.currency}`], ...data.revenue.map((row) => [row.month, invoicePriceInput(row.amount)]), [],
+    [t("Статус"), t("Количество счетов")], ...data.statuses.map((row) => [t(INVOICE_STATUS_LABELS[row.status]), row.count]), [],
+    [t("Клиент"), t`Поступления, ${data.currency}`], ...data.topClients.map((row) => [row.name, invoicePriceInput(row.amount)]), [],
+    [t("Дней после срока оплаты"), t`Остаток, ${data.currency}`, t("Количество счетов")],
+    ...data.aging.map((row) => [[t("В срок"), "1–30", "31–60", "61–90", t("Более 90")][row.bucket] ?? "", invoicePriceInput(row.amount), row.count]),
   ]);
 }

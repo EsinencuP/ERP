@@ -23,7 +23,8 @@ export async function createExpense(input: ExpenseInput): Promise<Result<Expense
   return withFinanceMutation("create", async (tx, session) => {
     const parsed = expenseSchema.safeParse(input); if (!parsed.success) return err("VALIDATION", "Проверьте поля расхода", { fields: parsed.error.flatten() });
     const data = parsed.data;
-    const row = await tx.expense.create({ data: { ...data, workspaceId: session.workspaceId, createdById: session.userId, date: new Date(`${data.date}T00:00:00.000Z`), receipt: data.receipt || null, notes: data.notes || null } });
+    if (data.projectId && !await tx.project.findUnique({ where: { id_workspaceId: { id: data.projectId, workspaceId: session.workspaceId } }, select: { id: true } })) return err("NOT_FOUND", "Проект не найден");
+    const row = await tx.expense.create({ data: { ...data, projectId: data.projectId || null, workspaceId: session.workspaceId, createdById: session.userId, date: new Date(`${data.date}T00:00:00.000Z`), receipt: data.receipt || null, notes: data.notes || null } });
     const expense = toExpense(row); await auditExpense(tx, session, "created", expense, null); return ok(expense);
   });
 }
@@ -34,7 +35,8 @@ export async function updateExpense(id: string, version: number, input: ExpenseI
     const existing = await getVersionedExpense(tx, session, id, version); if (!existing.ok) return existing;
     const parsed = expenseSchema.safeParse(input); if (!parsed.success) return err("VALIDATION", "Проверьте поля расхода", { fields: parsed.error.flatten() });
     const data = parsed.data;
-    const row = await tx.expense.update({ where: { id_workspaceId: { id, workspaceId: session.workspaceId }, version }, data: { ...data, date: new Date(`${data.date}T00:00:00.000Z`), receipt: data.receipt || null, notes: data.notes || null, version: { increment: 1 } } });
+    if (data.projectId && !await tx.project.findUnique({ where: { id_workspaceId: { id: data.projectId, workspaceId: session.workspaceId } }, select: { id: true } })) return err("NOT_FOUND", "Проект не найден");
+    const row = await tx.expense.update({ where: { id_workspaceId: { id, workspaceId: session.workspaceId }, version }, data: { ...data, projectId: data.projectId === undefined ? existing.data.projectId : data.projectId || null, date: new Date(`${data.date}T00:00:00.000Z`), receipt: data.receipt || null, notes: data.notes || null, version: { increment: 1 } } });
     const expense = toExpense(row); await auditExpense(tx, session, "updated", expense, toExpense(existing.data)); return ok(expense);
   });
 }

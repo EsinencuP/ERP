@@ -1,3 +1,5 @@
+import { getI18n } from "@/i18n/server";
+import { EXPENSE_CATEGORY_LABELS } from "./presentation";
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -51,14 +53,15 @@ export async function getPnlReport(filters: PnlFilters): Promise<Result<PnlRepor
 export async function getPnlExport(filters: PnlFilters): Promise<Result<(string | number)[][]>> {
   const result = await readPnlReport(filters, true); if (!result.ok) return result;
   const data = result.data;
+  const { t } = await getI18n();
   return ok([
-    ["Отчёт", "P&L"], ["С", data.from], ["По (включительно)", data.to], ["Часовой пояс", PNL_TIMEZONE],
-    ["Валюта", data.currency], ["Сформирован (UTC)", data.asOf],
-    ["Revenue basis", "Полные суммы счетов с налогом по дате окончательной оплаты; частичные оплаты исключены"],
-    ["Показатель", `Сумма, ${data.currency}`, "Количество"],
-    ["Revenue", invoicePriceInput(data.revenue), data.invoiceCount], ["Expenses", invoicePriceInput(data.expenses), data.expenseCount],
-    ["Net Profit", invoicePriceInput(data.netProfit), ""], [],
-    ["Категория расходов", `Сумма, ${data.currency}`, "Количество"],
-    ...data.categories.map((row) => [row.category, invoicePriceInput(row.amount), row.count]),
+    [t("Отчёт"), "P&L"], [t("С"), data.from], [t("По (включительно)"), data.to], [t("Часовой пояс"), PNL_TIMEZONE],
+    [t("Валюта"), data.currency], [t("Сформирован (UTC)"), data.asOf],
+    [t("Revenue basis"), t("Полные суммы счетов с налогом по дате окончательной оплаты; частичные оплаты исключены")],
+    [t("Показатель"), t`Сумма, ${data.currency}`, t("Количество")],
+    [t("Revenue"), invoicePriceInput(data.revenue), data.invoiceCount], [t("Expenses"), invoicePriceInput(data.expenses), data.expenseCount],
+    [t("Net Profit"), invoicePriceInput(data.netProfit), ""], [],
+    [t("Категория расходов"), t`Сумма, ${data.currency}`, t("Количество")],
+    ...data.categories.map((row) => [t(EXPENSE_CATEGORY_LABELS[row.category]), invoicePriceInput(row.amount), row.count]),
   ]);
 }

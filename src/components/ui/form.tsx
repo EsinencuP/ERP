@@ -1,4 +1,6 @@
 "use client"
+import { useI18n } from "@/i18n/use-i18n";
+
 
 import * as React from "react"
 import * as LabelPrimitive from "@radix-ui/react-label"
@@ -98,8 +100,10 @@ const FormLabel = React.forwardRef<
   React.ElementRef<typeof LabelPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof LabelPrimitive.Root>
 >(({ className, ...props }, ref) => {
+  const { t } = useI18n();
+
   const field = useFormField()
-  if (!field.ok) return <p role="alert">{field.error.message}</p>
+  if (!field.ok) return <p role="alert">{t(field.error.message)}</p>
   const { error, formItemId } = field.data
 
   return (
@@ -118,8 +122,10 @@ const FormControl = React.forwardRef<
   React.ElementRef<typeof Slot>,
   React.ComponentPropsWithoutRef<typeof Slot>
 >(({ ...props }, ref) => {
+  const { t } = useI18n();
+
   const field = useFormField()
-  if (!field.ok) return <p role="alert">{field.error.message}</p>
+  if (!field.ok) return <p role="alert">{t(field.error.message)}</p>
   const { error, formItemId, formDescriptionId, formMessageId } = field.data
 
   return (
@@ -143,8 +149,10 @@ const FormDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => {
+  const { t } = useI18n();
+
   const field = useFormField()
-  if (!field.ok) return <p role="alert">{field.error.message}</p>
+  if (!field.ok) return <p role="alert">{t(field.error.message)}</p>
   const { formDescriptionId } = field.data
 
   return (
@@ -163,8 +171,10 @@ const FormMessage = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, children, ...props }, ref) => {
+  const { t } = useI18n();
+
   const field = useFormField()
-  if (!field.ok) return <p role="alert">{field.error.message}</p>
+  if (!field.ok) return <p role="alert">{t(field.error.message)}</p>
   const { error, formMessageId } = field.data
   const body = error ? String(error?.message ?? "") : children
 

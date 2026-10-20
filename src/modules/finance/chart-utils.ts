@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { formatCurrency } from "@/lib/utils";
 
 /** Find an exact maximum for chart projection; keep money itself as integer strings. */
@@ -11,11 +12,11 @@ export function getChartValue(amount: string, maximum: string): number {
 }
 
 /** Label chart ticks compactly; exact unrounded amounts remain in tooltips and data tables. */
-export function getChartTick(value: number, maximum: string, currency: string): string {
+export function getChartTick(value: number, maximum: string, currency: string, locale: Locale = DEFAULT_LOCALE): string {
   const amount = BigInt(maximum) * BigInt(Math.max(0, Math.round(value * 10000))) / 1000000n;
-  const units = [[100000000000000n, "трлн"], [100000000000n, "млрд"], [100000000n, "млн"], [100000n, "тыс."]] as const;
+  const units = locale === "ru" ? [[100000000000000n, "трлн"], [100000000000n, "млрд"], [100000000n, "млн"], [100000n, "тыс."]] as const : [[100000000000000n, "tn"], [100000000000n, "bn"], [100000000n, "m"], [100000n, "k"]] as const;
   const unit = units.find(([scale]) => amount >= scale);
-  if (!unit) return formatCurrency(amount, currency);
+  if (!unit) return formatCurrency(amount, currency, locale);
   const tenths = amount * 10n / unit[0];
-  return `${tenths / 10n}${tenths % 10n ? `,${tenths % 10n}` : ""} ${unit[1]}`;
+  return `${tenths / 10n}${tenths % 10n ? `${locale === "ru" ? "," : "."}${tenths % 10n}` : ""} ${unit[1]}`;
 }

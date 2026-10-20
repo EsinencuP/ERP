@@ -10,6 +10,6 @@ export const actions: Record<Domain, ModuleActions> = {
   crm: { create: crm.createDealDocument, update: crm.updateDealDocument, delete: crm.deleteDealDocument },
   finance: { create: finance.createInvoiceDocument, update: finance.updateInvoiceDocument, delete: finance.deleteInvoiceDocument },
   inventory: { create: inventory.createProductDocument, update: inventory.updateProductDocument, delete: inventory.deleteProductDocument },
-  hr: { create: hr.createEmployee, update: hr.updateEmployee, delete: hr.deleteEmployee },
+  hr: { create: hr.createEmployeeDocument, update: hr.updateEmployeeDocument, delete: hr.deleteEmployeeDocument },
   projects: { create: projects.createProject, update: projects.updateProject, delete: projects.deleteProject },
 };

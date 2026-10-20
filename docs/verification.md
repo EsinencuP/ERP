@@ -1,5 +1,29 @@
 # Проверки реализации
 
+## Актуальный статус TASK-023
+
+20 октября 2026: TASK-023 закрыт. Главная `/`: Revenue/Open Deals/Low Stock/HR Pending, 6-month receipts LineChart, CRM count BarChart, пять последних счетов и восемь audit events; low_stock banner. Server Promise.all/no-store, строгие currency/live tenant/RBAC, exact money и безопасная сериализация audit summaries. Finance TASK-012 сохранён на `/finance/dashboard`, общие RevenueChart/RecentInvoices. Финальные build/strict typecheck/Prisma validate/status успешны, миграции/зависимости не добавлялись. HTTP/SQL: пять ролей/два tenants/live revoke/freshness/no-store, месяцы/частичная оплата/20-digit money, legacy exclusion, audit limit/private payload exclusion. Browser: обе темы/mobile/reduced motion, GET currency/Refresh/loading, low+zero banner condition, empty, finance regression, PG error без KPI/demo. Собственные fixtures удалены, cookies очищены, серверы остановлены. Отчёт: [TASK-023.md](TASK-023.md).
+
+## Актуальный статус TASK-022
+
+19 октября 2026: TASK-022 закрыт. `/projects/overview`: DONE/total, точный бюджет по Expense.projectId, команда без дублей и CSS Grid timeline. Create/edit плана/бюджета/дат/руководителя, фильтры/12-page/deep links. Финальные build/strict typecheck/Prisma validate/status/diff прошли; 11 миграций, старые расходы сохранены без проекта. HTTP/SQL: exact 20-digit money/zero/125%/раздельные валюты, 20+2 team, 12+1 projects, версии/конкуренция/пять ролей/live tenant/FK/audit rollback, P&L regression. Browser: формы/manager/shortcuts/focus, linked/unlinked expense, поздняя загрузка picker, однодневный timeline/validation/preserved window, фильтры/empty/READONLY, обе темы/390 px/reduced motion. Loading/PG error скрывают прежние карточки без fallback; свежая консоль без ошибок. Собственные fixtures удалены, cookie очищены, серверы остановлены. Отчёт: [TASK-022.md](TASK-022.md).
+
+## Актуальный статус TASK-021
+
+19 октября 2026: TASK-021 закрыт. `/projects`: task Kanban TODO/IN_PROGRESS/IN_REVIEW/DONE, priority/avatar/due, TanStack List/filters/CRUD; общие CRM DnD factory/sensors, legacy `/projects/documents`. Финальные build/strict typecheck/Prisma validate/status/diff успешны, 10 миграций. REVIEW rename сохранил ID/version/relations. HTTP/SQL подтвердили RBAC/live tenant/version/concurrency/hierarchy, exact due date/completion, 20+3 pages/search, atomic task/project audit rollback. Browser: pointer/keyboard/select, формы/pickers, список/сортировка/поиск/empty, client conflict/network recovery, CRM empty-column regression, readonly/agent, две темы/390 px/reduced motion, loading/PG error без прежних карточек/demo. Собственные fixtures удалены, cookie очищены, серверы остановлены. Отчёт: [TASK-021.md](TASK-021.md).
+
+## Актуальный статус TASK-020
+
+19 октября 2026: TASK-020 закрыт. `/hr/[id]`: Header/Personal/Contact/Docs, Reporting to, ручной годовой лимит и календарный annual leave balance. Build/strict typecheck/Prisma validate/status/diff успешны, 9 миграций актуальны. HTTP/SQL: documents CRUD/пагинация, allowance/version/concurrency/atomic audit rollback, пять ролей/live membership/tenant, numeric CHECK/FK, переход года 4+3 рабочих дня, отдельный PENDING/исключение иных типов и статусов, 0/unset/negative. Browser: формы/год/контакты/документы/manager links, keyboard/focus, READONLY/AGENT, две темы/mobile/reduced motion, loading/error без старого профиля и demo. Собственные fixtures удалены, cookies очищены, серверы остановлены. Отчёт: [TASK-020.md](TASK-020.md).
+
+## Актуальный статус TASK-019
+
+19 октября 2026: TASK-019 закрыт. Leave form/register/history, PENDING → APPROVED/REJECTED, inclusive weekdays date-fns, manager pending sidebar badge. Build/strict typecheck/Prisma validate/status/diff успешны. HTTP/SQL подтвердили пять ролей, live membership/tenant, days/strict input/version, concurrent overlap/decision и audit rollback. Browser: создание/approval/rejection и badge 23→24→23→22, filters/pages, terminal readonly, collapsed/mobile 99+/112, две темы/390 px, keyboard/focus/reduced motion. При отказе PostgreSQL строки убраны, ошибка сервиса и ! вместо count. Fixtures удалены, cookie очищены, серверы остановлены. Без новых миграций/зависимостей/тестовых файлов. Отчёт: [TASK-019.md](TASK-019.md).
+
+## Актуальный статус TASK-018
+
+19 октября 2026: TASK-018 закрыт. `/hr` использует Employee Grid/List, серверный поиск/department/status/пагинацию и versioned profile CRUD. `/hr/org-chart` — recursive manager hierarchy со сворачиванием, несколькими корнями и всеми статусами. Strict build/typecheck и Prisma validate/status/diff прошли. HTTP/SQL проверили пять ролей, tenant/version/audit, literal/Cyrillic search, concurrent cycle prevention, audit rollback, повреждённый граф и лимит 2000. Browser: Grid/List совпадают, profile CRUD/manager, keyboard/focus, readonly/foreign, обе темы/mobile 390 px/reduced motion. При отказе БД данные убраны, показана ошибка без fallback. Legacy HR и Inventory search regression прошли. Новых миграций/зависимостей/тестовых файлов нет. Fixtures удалены, cookie очищены, серверы остановлены. Отчёт: [TASK-018.md](TASK-018.md).
+
 ## Актуальный статус TASK-017 / CHECKPOINT-03
 
 19 октября 2026: TASK-017 закрыт, CHECKPOINT-03 пройден. `/inventory/dashboard`: четыре KPI и Reorder suggested для low/zero stock, отдельные точные валютные суммы. Финальные build и npx tsc --noEmit успешны; Prisma validate/status/diff — 8 миграций, без различий. `npm run check:finance-inventory` — 9/9 pass на production HTTP/Auth/PostgreSQL: Invoice CRUD/PDF, платежи, Finance KPI/P&L/expenses/CSV, stock/warehouse/ledger/concurrency/audit/RBAC. Браузер: dark/light, 390 px, filters/empty/readonly/foreign, reduced motion, Refresh/sidebar после IN. При остановке БД STORAGE без data/fallback, карточки и таблица убраны. Fixtures удалены, triggers включены, cookies очищены, серверы остановлены. Отчёты: [TASK-017.md](TASK-017.md), [CHECKPOINT-03.md](CHECKPOINT-03.md).
@@ -120,3 +144,13 @@ Playwright использовался для интерактивных сцен
 ## Не подтверждено исходным этапом (история до TASK-002)
 
 Docker и PostgreSQL CLI отсутствуют в доступной среде. Миграция на живой PostgreSQL, bootstrap реального пользователя, cookie-авторизация, роли/изоляция двух tenants, конкурентные транзакции и rollback платежей на БД не проверены. Эти сценарии перечислены в CHECKPOINT-001 (`roadmap.md`). Не считать валидацию Prisma доказательством успешной миграции или production readiness.
+
+
+## Локализация EN/RU — 20.10.2026
+
+- Финальный npm run build: PASS; npm run typecheck (tsc --noEmit): PASS; npx prisma validate: PASS.
+- 1703 пары сообщений: одинаковые ключи, заполненный ru, совпадающие placeholders; точечные проверки интерполяции пользовательского текста, склонений и точного formatCurrency прошли.
+- Браузер: 17 основных маршрутов, сохранение языка, английский по умолчанию/invalid-cookie fallback, локализованные API ошибки, P&L CSV и invoice PDF en/ru. PDF отрисованы Poppler и просмотрены.
+- Финальная production-сборка: вход → Dashboard → Settings → смена языка → reload; светлая тема и 375 px, pageerror = 0, горизонтальное переполнение = false.
+- Изолированное локальное PostgreSQL-пространство использовано только для проверки, без демоподмены. Полный отчёт и снимки — [LOCALIZATION.md](LOCALIZATION.md).
+- Это проверка текущего изменения, а не CHECKPOINT-04/05: TASK-024—030 ещё не реализованы.

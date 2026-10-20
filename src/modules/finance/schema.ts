@@ -43,6 +43,7 @@ function isReceiptUrl(value: string): boolean {
 }
 const expenseReceiptSchema = z.string().trim().max(2048, "Ссылка — до 2048 символов").refine(isReceiptUrl, "Укажите ссылку http(s) без логина и пароля").transform((value) => value ? new URL(value).href : "");
 export const expenseSchema = z.object({
+  projectId: identifierSchema.optional(),
   title: z.string().trim().min(1, "Введите название расхода").max(200, "Не более 200 символов"),
   amount: invoicePaymentSchema.shape.amount,
   currency: financeCurrencySchema.default("RUB"),
@@ -54,6 +55,7 @@ export const expenseSchema = z.object({
 export const expenseFormSchema = expenseSchema.extend({ amount: z.string().regex(majorAmountPattern, "Сумма: до 2 знаков после точки").refine((value) => /[1-9]/.test(value), "Сумма должна быть больше нуля") });
 export const expenseFiltersSchema = z.object({
   page: z.number().int().min(1).max(1000000).default(1), pageSize: z.number().int().min(1).max(100).default(20),
+  projectId: financeRecordIdSchema.optional(),
   search: z.string().trim().max(200).default(""), category: expenseCategorySchema.optional(), currency: financeCurrencySchema.optional(),
 }).strict();
 

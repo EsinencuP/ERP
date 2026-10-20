@@ -62,3 +62,10 @@ Actions: getExpenses/getExpense/createExpense/updateExpense/deleteExpense. Works
 Серверная таблица поддерживает category/currency/search и bounded pagination, date desc/createdAt desc/id asc. Page/count читаются Promise.all; при конкурентной записи возможен краткий сдвиг count до refresh. Формы принимают основные единицы с точностью 2 знака и точно переводят в копейки существующим BigInt helper. Detail доступен READONLY и показывает весь комментарий. Пустые receipt/notes сохраняются как null.
 
 Receipt в этой задаче — ссылка http(s) на чек, без URL credentials; scheme/URL/длина проверяются Zod и повторно перед рендером href. Сервер не делает запрос по receipt, browser открывает его только по клику в новой вкладке с noopener/noreferrer. Это не upload или хранилище файлов. Платежи и Revenue KPI TASK-012 отражают поступления; расходы их не уменьшают.
+
+TASK-022: Expense получает optional projectId для Budget usage Projects Overview. Форма использует shared RecordPicker, backend проверяет workspace проекта; link nullable, budget рассчитывается отдельно по валютам без FX. Старый API update без projectId сохраняет ссылку, explicit empty снимает её. `/finance/expenses?projectId=…` фильтрует расходы проекта и предвыбирает его в create form; вся P&L-логика остаётся прежней.
+
+
+## Main Dashboard — TASK-023
+
+Главный `/` выводит Revenue/6-month receipts/recent five invoices с выбором currency через Server Component. Полный FinanceDashboard TASK-012 (четыре финансовых KPI, status donut, top clients, aging и CSV) перенесён в `/finance/dashboard`, доступен вкладкой «Обзор». RevenueChart/RecentInvoices общие для обоих экранов, правила сумм/UTC/валют сохранены.

@@ -1,5 +1,56 @@
 # Архитектура Evo ERP
 
+## Main Dashboard — TASK-023
+
+`/` — Server Component с force-dynamic, force-no-store и noStore для прямых Prisma reads. После live session/валидации currency пять независимых источников запускаются одним Promise.all: Finance aggregates, CRM stage counts, общий Inventory alert, HR pending approver count, последние восемь AuditEvent summaries. Legacy WorkspaceState/Documents не участвуют в KPI. Revenue — cash receipts с налогом за всё время в выбранной RUB/USD/EUR, 6 месяцев включая текущий/UTC; Open Deals исключает WON/LOST, bar chart показывает количество всех шести этапов без суммирования валют. Inventory KPI включает active low+zero stock из shared CTE; баннер появляется именно при low_stock > 0. HR pending сохраняет manager/admin policy; остальным показана недоступность, а не нулевой счётчик. Audit ограничен workspace, без before/after, с устойчивой сортировкой date/id и безопасными entity links. Ошибка источника видима и не превращается в ноль; ошибка auth скрывает весь dashboard.
+
+Разметка server-rendered, client islands — Recharts и refresh/currency controls. Во время перехода прошлый snapshot скрыт skeleton; новый server snapshot загружается обычным GET. Money остаётся Decimal→string/BigInt, график использует общий bounded projection. Shared RevenueChart и RecentInvoices повторно используются Finance; прежняя полная аналитика TASK-012 сохранена на `/finance/dashboard` с nav. Новых моделей/миграций/зависимостей нет.
+
+
+## Projects Overview — TASK-022
+
+`/projects/overview` читает страницу из 12 нормализованных проектов и выводит progress (DONE / все Task, включая CANCELLED), бюджет/расходы, distinct team и CSS Grid timeline тех же проектов. Карточки/count/task aggregates/expense aggregates/team preview читаются в одном RepeatableRead snapshot. Search/status/projectId tenant-scoped, literal/Cyrillic search shared sqlTextMatch; страницы clamp. Team = manager UNION task assignees, ID distinct; manager первым, inactive assignments отмечены и сохранены. Preview ≤6, full team pagination по 20, без unbounded user/task arrays.
+
+Budget usage = SUM(Expense.amount) с projectId и той же currency, за всё время. Другие валюты показаны отдельно без FX. Invoice revenue не считается расходом. Суммы Decimal→string/BigInt, только bounded bar % преобразуется в Number. Нулевой бюджет не даёт NaN/Infinity; overspend отображается явно, fill ограничен 100%, текстовый % остаётся точным. Additive migration `20261019000600_project_expenses` добавляет nullable Expense.projectId, composite tenant FK RESTRICT и индекс workspace/project/currency; прежние расходы остаются без проекта. Expense CRUD/picker и filtered deep link позволяют назначить проект, пересчёт derived без ручного spent. Старый update Expense без projectId сохраняет назначение; explicit empty снимает связь.
+
+Настройки проекта (code/name/description/status/budget/currency/manager/startDate/endDate) используют shared Projects mutation helper, RBAC, strict Zod, captured version и atomic audit. Связи contact/task и данные legacy не меняются. Новый manager должен быть active workspace member, прежний inactive сохраняется при других правках. Бюджет не переименовывает валюту связанных расходов: они остаются отдельными валютными суммами. Project status ручной, progress всегда derived из реальных задач.
+
+Timeline строится CSS Grid без Gantt-библиотеки: 1…93 календарных дня, default 6 недель относительно Москвы; UTC day arithmetic без DST drift. Явные Project.startDate/endDate, inclusive single-day bars, clipping по периоду и отдельный текст для незаданных/внешних дат. Частичные периоды не выдумываются. Один и тот же выбранный период сохраняется при фильтрах/страницах/refresh. Internal horizontal scroll и sticky project labels; task progress fill не меняет даты проекта. Deep links связывают overview → tasks/expenses и обратно; ошибки PostgreSQL скрывают прежние карточки/timeline без demo fallback.
+
+
+## Projects Task Kanban + List — TASK-021
+
+`/projects` читает нормализованные Task/Project; прежний Document-реестр сохранён в `/projects/documents` с прежними legacy actions. Четыре колонки TODO/IN_PROGRESS/IN_REVIEW/DONE, priority badge, workspace-member avatar и due date. Прежний Document count badge показывается только на вкладке реестра. SQL migration переименовывает TaskStatus.REVIEW в IN_REVIEW на месте, без переписывания задач. Существующий CANCELLED сохранён только для чтения истории в List. DONE заполняет completedAt, reopening очищает его.
+
+ЗАКОН 6: CRM collision detection/keyboard navigation и Pointer/Keyboard sensors вынесены в `src/hooks/use-kanban-dnd.ts`. CRM pipeline сохраняет экспортируемые adapters, Projects использует тот же factory/hook: drop только в колонки, отмена вне board, стрелки через пустую колонку. DragOverlay визуальный, отдельный handle и select-alternative. Перенос меняет статус, ручное ранжирование внутри колонок не добавляется; порядок updatedAt desc/id asc. Position и task hierarchy сохраняются.
+
+List использует CRM-паттерн TanStack v8: getRowId, manualPagination/manualSorting и серверный whitelist sort. Оба вида читаются в одном RepeatableRead snapshot (четыре bounded column pages + list page, по 20). Поиск literal/Cyrillic через shared sqlTextMatch; общие project/assignee/priority/search, status только для List. Страницы clamp по server count. Никаких unbounded task lists. Project/member picker — общий RecordPicker с поиском/пагинацией; inactive user/member не назначается, старое назначение сохраняется при редактировании других полей.
+
+Task CRUD и minimal project create используют live session/workspace и shared Projects RBAC: READONLY читает, AGENT+ создают/меняют, MANAGER+ удаляют leaf task. Serializable transaction, expected version и audit атомарны, retry только гарантированного P2034 rollback. Project ownership/parent не меняются через task form, delete с children запрещён. Due date хранится до конца выбранного дня Москвы; unchanged date сохраняет исходный timestamp. Неизвестный результат DnD откатывает отображение с явной ошибкой и блокирует повтор до refresh; committed status не откатывается при ошибке последующего чтения. Failed refresh скрывает старые данные, demo fallback отсутствует.
+
+
+## HR Employee Profile — TASK-020
+
+`/hr/[id]`: header с Avatar/Name/Position/Status; слева данные Employee, контакты и named document links, справа годовой leave balance и Reporting to. Имена в Grid/List/Org Chart и руководитель ведут в профиль. Профиль редактируется общей EmployeeFormSheet; документы — отдельные versioned EmployeeDocumentLink с title/url/notes. URL только http(s), без credentials, при рендере повторная валидация; файл не загружается и сервер не запрашивает URL.
+
+Новая LeaveAllowance хранит ручной целый лимит 0…9999 рабочих дней на Employee/year, без неявного default. Нет записи → «Не задан», 0 — явный нулевой лимит. Назначают MANAGER/ADMIN/SUPER_ADMIN; version=0 допустима только при отсутствии записи. Остаток = лимит − APPROVED ANNUAL weekdays в выбранном календарном году, включая будущие дни; PENDING отдельно. SQL клипует переходящий отпуск границами года и исключает выходные. Другие типы/статусы не входят; отрицательный остаток сохраняется. Праздники, half-days, автоматические начисления и carryover не моделируются; лимит не блокирует workflow согласования.
+
+Профиль проверяет live session/tenant, независимые документы/count/manager/balance читает Promise.all; баланс и лимит одним SQL statement, документы по 10 на странице. Весь профиль не является единым snapshot. Documents/allowance mutations используют существующий HR RBAC, strict Zod, version, Serializable и atomic audit. Document delete только ADMIN/SUPER_ADMIN. Новые tenant composite FK и CHECK в additive migration `20261019000400_employee_profile`. Employee с документами/лимитами удалять нельзя. PostgreSQL error скрывает прежние данные и не включает demo fallback.
+
+## HR Leave Management — TASK-019
+
+`/hr/leaves` читает нормализованный Leave с пагинацией/search/status/type, по умолчанию очередь PENDING. Create принимает employee/type/startDate/endDate/reason; дни вычисляются сервером и тем же shared date-fns helper в форме. Период включительный, исключаются суббота/воскресенье. DATE хранится как календарная дата UTC midnight, date-fns получает date-only parseISO для календарного расчёта. Нулевые периоды, неверные/обратные даты и >9999 рабочих дней отклоняются.
+
+MANAGER/ADMIN/SUPER_ADMIN рассматривают весь workspace; организационная manager self-relation не задаёт отдельный ACL. AGENT+ создают заявки, READONLY читает. PENDING → APPROVED/REJECTED проверяет live роль, id/workspace, version и статус; автор решения сохраняется в approvedById для обоих исходов. Терминальные заявки не редактируются/удаляются. Serializable create/decision и audit атомарны, пересекающиеся PENDING/APPROVED заявки одного сотрудника запрещены; только P2034 допускает retry. Неактивным Employee не создают/одобряют отпуск, pending можно отклонить. Employee.status не меняется автоматически от будущего отпуска.
+
+Layout параллельно читает state, stock alert и manager-only pending leave count. HR badge показывает полный PENDING count, 99+ визуально, ошибку как !; для AGENT/READONLY/demo скрыт. Актуализируется после committed leave changes, focus окна, переходов и Refresh, без polling. Ошибки не заменяются demo/нулями. Новых моделей/миграций/зависимостей нет: Leave и date-fns уже присутствуют.
+
+## HR Employee Directory + Org Chart — TASK-018
+
+`/hr` читает нормализованный Employee, Grid/List используют одну paginated выборку с server-side search/department/status. `/hr/org-chart` читает полный tenant-scoped набор до 2000 узлов и строит рекурсивные сворачиваемые ветки через managerId self-relation. Лимит явный: больший набор возвращает ошибку, а не неполную структуру. Циклы/отсутствующие родители проверяются до рендера. Все статусы сохранены в иерархии. Avatar использует shared initials fallback; новых полей/миграций нет.
+
+Employee profile CRUD проверяет live session/workspace, strict Zod, version и HR RBAC; Serializable transaction атомарно пишет профиль и audit. Рекурсивный SQL с UNION проверяет всю цепочку руководителей в workspace и отклоняет self/descendant/cyclic manager. P2034 повторяется только после гарантированного rollback. Employee с reports, Leave, документами или годовым лимитом не удаляется; MANAGER по действующей политике HR не может удалять. User/login не создаётся и userId не редактируется. DTO не содержит auth/payroll данных. Прежние Document-данные и действия сохранены в `/hr/documents`; автоматического переноса нет.
+
 ## Inventory Stock Movements + Warehouses — TASK-016
 
 `/inventory/warehouses` управляет нормализованными складами (code/name/address/isActive) с live Inventory RBAC, version, atomic audit и bounded search/pagination. Product name ведёт на `/inventory/[id]`: totals, paginated warehouse positions и immutable Date/Type/Qty/Reference ledger. Чтения summary/positions/ledger выполняются Promise.all; каждый запрос проверяет tenant, включая отсутствие/чужой id. Missing StockItem читается как qty=0/version=0 без записи в БД.
@@ -273,3 +324,10 @@ ContactFormSchema — pick общих контактных полей плюс s
 ### Inventory overview — TASK-017
 
 `/inventory/dashboard`: глобальные KPI активных Product и таблица пополнения. Повторно используется tenant-scoped SQL CTE каталога/alert; KPI и список загружаются параллельно. Сумма stock × salePrice округляется по SKU до копеек и возвращается точными строками отдельно по каждой валюте. Low count исключает нули, out count включает нули, список содержит оба статуса. Поиск/статус/страницы не ограничивают KPI. Изменений схемы нет; shared InventoryNavigation связывает overview, каталог и склады.
+
+
+## Localization — English / Русский
+
+UI использует next-intl без языковых префиксов URL. `src/i18n/request.ts` читает проверенную cookie `evo_locale`; по умолчанию `en`, поддерживается `ru`. `useI18n`/`getI18n` связывают каталог с конкретным запросом, без глобального изменяемого языка. Settings сохраняет личный выбор браузера через авторизованный Server Action и перезагружает интерфейс целиком.
+
+Каталоги `src/i18n/en.json` и `ru.json` содержат системные подписи и сообщения. Интерполяции передаются отдельно через tagged templates, пользовательские поля не переводятся. Enum/status/ключи БД сохраняются. Ошибки Result локализуются на Server Action/API границе; успешные бизнес-данные не изменяются. Форматтеры дат, валют, количеств, графиков и PDF принимают locale явно. CSV переводит заголовки и системные значения, сохраняя точные числовые ячейки. Подробнее: [LOCALIZATION.md](LOCALIZATION.md).

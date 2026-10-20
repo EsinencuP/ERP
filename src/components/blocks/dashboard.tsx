@@ -1,36 +1,38 @@
-"use client";
-import { useState } from "react";
+
+import { useI18n } from "@/i18n/use-i18n";
 import Link from "next/link";
-import { Activity, ArrowRight, CreditCard, FolderKanban, Handshake, Plus } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import { Activity, ArrowRight, CircleDollarSign, Handshake, PackageSearch, TriangleAlert, Users } from "lucide-react";
 import { EmptyState } from "@/components/ui/feedback";
-import { dateLabel, initials } from "@/lib/utils";
-import { usePermissions } from "@/hooks/usePermissions";
-import { canWrite } from "@/lib/permissions";
-import { modules } from "@/lib/modules";
-import { FinanceDashboard } from "@/modules/finance/components/finance-dashboard";
-import type { FinanceDashboardData } from "@/modules/finance/types";
-import type { Result, SessionContext, WorkspaceState } from "@/types/shared";
+import { RelativeTime } from "@/components/ui/relative-time";
+import { formatCurrency, initials } from "@/lib/utils";
+import { RevenueChart } from "@/modules/finance/components/revenue-chart";
+import { RecentInvoices } from "@/modules/finance/components/recent-invoices";
+import { PipelineChart } from "@/modules/dashboard/components/pipeline-chart";
+import { DashboardFrame } from "@/modules/dashboard/components/dashboard-frame";
+import { getDashboardActivityLink, DASHBOARD_DOMAINS, DASHBOARD_ACTIONS } from "@/modules/dashboard/presentation";
+import type { DashboardData } from "@/modules/dashboard/types";
+import type { FinanceCurrency } from "@/modules/finance/types";
+import type { AppError } from "@/types/shared";
 
-const quickLinks = [
-  { href: "/crm/contacts", icon: Handshake, title: "Клиенты", description: "Открыть контакты CRM" },
-  { href: "/finance", icon: CreditCard, title: "Счета", description: "Открыть счета и создать черновик" },
-  { href: "/projects?create=1", icon: FolderKanban, title: "Проекты", description: "Запланировать новую работу" },
-];
+function ReadError({ title, error }: { title: string; error: AppError }) {
+  const { t } = useI18n();
+ return <section className="motion-fade panel min-w-0 p-5 sm:p-6"><h2 className="text-sm font-semibold">{t(title)}</h2><p role="alert" className="mt-4 text-xs text-destructive">{t(error.message)}</p></section>; }
 
-/** Combine normalized finance KPIs/charts with existing operational summaries and audit activity. */
-export function Dashboard({ state, session, finance }: { state: WorkspaceState; session: SessionContext; finance: Result<FinanceDashboardData> }) {
-  const { role } = usePermissions(), [quickOpen, setQuickOpen] = useState(false);
-  const deals = state.documents.filter((row) => row.domain === "crm"), projects = state.documents.filter((row) => row.domain === "projects");
-  const activeDeals = deals.filter((row) => !["Выиграна", "Проиграна"].includes(row.data.status)).length;
-  const activeProjects = projects.filter((row) => row.data.status !== "Завершён").length;
-  return <div className="min-w-0 space-y-7">
-    <header className="motion-fade flex flex-wrap items-end justify-between gap-4"><div><p className="eyebrow mb-3 text-muted-foreground">ВАШ БИЗНЕС В ФОКУСЕ</p><h1 className="page-title">Всё под контролем<span className="text-primary">.</span></h1><p className="mt-2 text-xs text-muted-foreground">Добрый день, {session.name.split(" ")[0]}. Вот чем живёт ваше пространство.</p></div><div className="flex gap-2"><Button asChild variant="outline"><Link href="/finance/payments"><CreditCard />Платежи</Link></Button>{canWrite(role) && <Button onClick={function handleCreate() { setQuickOpen(true); }}><Plus />Создать</Button>}</div></header>
-    <FinanceDashboard initialData={finance} />
-    <div className="grid min-w-0 gap-5 xl:grid-cols-2"><section className="motion-fade panel p-5 sm:p-6"><h2 className="text-sm font-semibold">Операционная сводка</h2><div className="mt-5 grid gap-4 sm:grid-cols-2">{[{ href: "/crm", label: "Активные сделки", value: activeDeals, total: deals.length, icon: Handshake }, { href: "/projects", label: "Проекты в работе", value: activeProjects, total: projects.length, icon: FolderKanban }].map((item) => <Link key={item.href} href={item.href} className="motion-fade rounded-xl border p-4 transition-colors hover:bg-accent"><div className="flex items-center justify-between gap-3"><span className="text-xs text-muted-foreground">{item.label}</span><item.icon className="size-4 text-primary" /></div><p className="mt-4 font-mono text-3xl font-semibold">{item.value}</p><p className="mt-3 flex items-center justify-between text-xs text-muted-foreground">Всего: {item.total}<ArrowRight className="size-3" /></p></Link>)}</div></section>
-      <section className="motion-fade panel min-w-0 p-5 sm:p-6"><div className="flex items-center justify-between"><h2 className="text-sm font-semibold">Ритм команды</h2><Activity className="size-4 text-muted-foreground" /></div>{state.events.length ? <ul className="mt-5 space-y-5">{state.events.slice(0, 4).map((event) => <li key={event.id} className="motion-fade flex gap-3"><span className="avatar size-8 shrink-0 text-[9px]">{initials(event.actor)}</span><div className="min-w-0"><p className="text-xs"><span className="font-medium">{event.actor.split(" ")[0]}</span><span className="text-muted-foreground"> {event.action === "payment" ? "зарегистрировал(а) оплату" : event.action === "created" ? "добавил(а) запись" : event.action === "deleted" ? "удалил(а) запись" : "обновил(а) запись"}</span></p><Link href={`/${event.domain}`} className="mt-1 block truncate text-xs text-primary hover:underline">{event.title}</Link><p className="mt-1 text-[10px] text-muted-foreground">{dateLabel(event.createdAt)} · {modules[event.domain].title}</p></div></li>)}</ul> : <EmptyState title="Пока нет событий" />}</section>
-    </div>
-    <Dialog open={quickOpen} onOpenChange={setQuickOpen}><DialogContent><DialogTitle>Что создадим?</DialogTitle><DialogDescription className="mb-5 mt-2 text-xs text-muted-foreground">Выберите раздел рабочего пространства.</DialogDescription><div className="space-y-2">{quickLinks.map((item) => <Link key={item.href} href={item.href} onClick={function handleNavigate() { setQuickOpen(false); }} className="motion-fade flex items-center gap-4 rounded-xl border p-4 hover:bg-accent"><item.icon className="size-5 text-primary" /><span><span className="block text-sm font-medium">{item.title}</span><span className="mt-1 block text-xs text-muted-foreground">{item.description}</span></span><ArrowRight className="ml-auto size-4" /></Link>)}</div></DialogContent></Dialog>
-  </div>;
+/** Render normalized cross-module KPIs, paired charts, five invoices and bounded audit summaries on the server. */
+export function Dashboard({ data, name, currency, now }: { data: DashboardData; name: string; currency: FinanceCurrency; now: string }) {
+  const { t , locale: uiLocale } = useI18n();
+
+  const { finance, deals, stock, pending, activity } = data;
+  const metrics = [
+    { key: "revenue", label: t("Dashboard Revenue"), value: finance.ok ? formatCurrency(finance.data.kpis.totalRevenue, currency, uiLocale) : "—", description: t`Поступления за всё время · ${currency}`, error: finance.ok ? null : finance.error, href: "/finance/payments", icon: CircleDollarSign },
+    { key: "openDeals", label: t("Open Deals"), value: deals.ok ? String(deals.data.open) : "—", description: t("Без выигранных и проигранных"), error: deals.ok ? null : deals.error, href: "/crm/pipeline", icon: Handshake },
+    { key: "lowStock", label: t("Low Stock Alert"), value: stock.ok ? String(stock.data.total) : "—", description: stock.ok ? t`Мало: ${stock.data.lowStock} · Нет: ${stock.data.outOfStock}` : t("Товары требуют пополнения"), error: stock.ok ? null : stock.error, href: "/inventory/dashboard", icon: PackageSearch },
+    { key: "hrPending", label: t("HR Pending"), value: pending.ok ? String(pending.data) : "—", description: pending.ok ? t("Заявки на отпуск ждут решения") : pending.error.code === "FORBIDDEN" ? t("Доступно руководителям") : t("Заявки на отпуск"), error: pending.ok || pending.error.code === "FORBIDDEN" ? null : pending.error, href: "/hr/leaves", icon: Users },
+  ];
+  return <DashboardFrame currency={currency} name={name} now={now}>
+    <div data-dashboard-kpis className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4">{metrics.map((metric) => <Link key={metric.key} href={metric.href} className={`motion-fade panel min-w-0 p-5 transition-colors hover:border-primary/40 ${metric.key === "revenue" ? "bg-primary/5" : ""}`}><div className="flex items-center justify-between gap-3"><h2 className="text-xs text-muted-foreground">{t(metric.label)}</h2><metric.icon className={`size-4 shrink-0 ${metric.key === "lowStock" && stock.ok && stock.data.total ? "text-warning" : "text-primary"}`} /></div><p data-kpi={metric.key} className="mt-4 break-words font-mono text-2xl font-semibold tabular-nums">{metric.value}</p><p className="mt-3 text-[11px] text-muted-foreground">{metric.description}</p>{metric.error && <p role="alert" className="mt-2 text-xs text-destructive">{t(metric.error.message)}</p>}</Link>)}</div>
+    {stock.ok && stock.data.lowStock > 0 && <aside data-low-stock-banner className="motion-fade flex flex-wrap items-center justify-between gap-4 rounded-xl border border-warning/30 bg-warning/10 p-4" aria-label={t("Предупреждение о низком запасе")}><div className="flex min-w-0 items-start gap-3"><TriangleAlert className="mt-0.5 size-5 shrink-0 text-warning" /><div><h2 className="text-sm font-semibold">{t("Запасы требуют внимания")}</h2><p className="mt-1 text-xs text-muted-foreground">{t("Мало на складе: ")}{stock.data.lowStock} {t(" товаров. Нет в наличии: ")}{stock.data.outOfStock}{t(". Проверьте план пополнения.")}</p></div></div><Link href="/inventory/dashboard" className="inline-flex shrink-0 items-center gap-2 text-xs font-medium text-primary hover:underline">{t("К пополнению")}<ArrowRight className="size-3" /></Link></aside>}
+    <div data-dashboard-charts className="grid min-w-0 gap-5 xl:grid-cols-2">{finance.ok ? <RevenueChart revenue={finance.data.revenue} currency={currency} /> : <ReadError title={t("Поступления за 6 месяцев")} error={finance.error} />}{deals.ok ? <PipelineChart data={deals.data} /> : <ReadError title={t("Воронка сделок")} error={deals.error} />}</div>
+    <div data-dashboard-details className="grid min-w-0 gap-5 xl:grid-cols-2">{finance.ok ? <RecentInvoices invoices={finance.data.recentInvoices} currency={currency} /> : <ReadError title={t("Последние счета")} error={finance.error} />}{!activity.ok ? <ReadError title={t("Лента действий")} error={activity.error} /> : <section className="motion-fade panel min-w-0 p-5 sm:p-6" aria-labelledby="dashboard-activity-title"><header className="flex justify-between gap-3"><div><h2 id="dashboard-activity-title" className="text-sm font-semibold">{t("Лента действий")}</h2><p className="mt-1 text-xs text-muted-foreground">{t("Последние 8 событий рабочего пространства")}</p></div><Activity className="size-4 shrink-0 text-muted-foreground" /></header>{activity.data.length ? <ol className="mt-5 divide-y">{activity.data.map((event) => { const href = getDashboardActivityLink(event); return <li key={event.id} className="motion-fade flex gap-3 py-3 first:pt-0 last:pb-0"><span aria-hidden="true" className="avatar size-8 shrink-0 text-[9px]">{initials(event.actor)}</span><div className="min-w-0"><p className="break-words text-xs"><span className="font-medium">{event.actor}</span><span className="text-muted-foreground"> {Object.hasOwn(DASHBOARD_ACTIONS, event.action) ? DASHBOARD_ACTIONS[event.action] : t("изменил(а) запись")}</span></p>{href ? <Link href={href} className="mt-1 block truncate text-xs text-primary hover:underline" title={event.title}>{event.title}</Link> : <p className="mt-1 truncate text-xs" title={event.title}>{event.title}</p>}<p className="mt-1 text-[10px] text-muted-foreground"><RelativeTime value={event.createdAt} now={now} /> · {Object.hasOwn(DASHBOARD_DOMAINS, event.domain) ? DASHBOARD_DOMAINS[event.domain]?.label : t("Система")}</p></div></li>; })}</ol> : <EmptyState title={t("Пока нет действий")} description={t("Создание и изменение записей появятся здесь после сохранения.")} />}</section>}</div>
+  </DashboardFrame>;
 }

@@ -42,6 +42,18 @@
 
 **CHECKPOINT-03 — Finance + Inventory TASK-011–TASK-017: ПРОЙДЕН.** Production build/tsc, 9/9 интеграций, Invoice/PDF/KPI/P&L/stock/immutable ledger и браузер: [CHECKPOINT-03.md](CHECKPOINT-03.md).
 
+**TASK-018 — HR Employee Directory + Org Chart: ЗАКРЫТ.** Нормализованный каталог Grid/List, поиск/фильтры/профили и рекурсивная manager hierarchy с защитой циклов: [TASK-018.md](TASK-018.md).
+
+**TASK-019 — HR Leave Management: ЗАКРЫТ.** PENDING → APPROVED/REJECTED, date-fns weekday count, manager pending sidebar badge, tenant/RBAC/version/audit: [TASK-019.md](TASK-019.md).
+
+**TASK-020 — HR Employee Profile Page: ЗАКРЫТ.** Header/Personal/Contact/Docs, Reporting to, ручной годовой лимит и календарный leave balance: [TASK-020.md](TASK-020.md).
+
+**TASK-021 — Projects Task Kanban + List: ЗАКРЫТ.** Четыре колонки, общий CRM DnD-hook, TanStack List, приоритет/исполнитель/срок и versioned task CRUD: [TASK-021.md](TASK-021.md).
+
+**TASK-022 — Projects Overview: ЗАКРЫТ.** DONE/total progress, точный бюджет по связанным Expense, команда и CSS Grid timeline: [TASK-022.md](TASK-022.md).
+
+**TASK-023 — Main Dashboard KPIs + Charts + Activity: ЗАКРЫТ.** Четыре межмодульных KPI, два графика, пять счетов, audit feed и low-stock banner; server Promise.all/no-store: [TASK-023.md](TASK-023.md).
+
 Другие задания пользователя пока не закрывались. Нумерация остальных пунктов ниже — предварительная очередь развития ранее созданного каркаса, а не подтверждённое завершение будущих пользовательских задач.
 
 ## Текущий этап — запускаемый ERP Template
@@ -63,6 +75,12 @@
 - TASK-015: `/inventory`, Product/category, точные остатки по всем складам, per-product thresholds/status и sidebar alerts.
 - TASK-016: `/inventory/warehouses`, `/inventory/[id]`, неизменяемые движения, атомарные переносы и журнал по товару.
 - TASK-017: `/inventory/dashboard`, глобальные active-product KPI, стоимость по валютам и low/zero-stock список пополнения.
+- TASK-018: `/hr` Grid/List Employee directory и профиль, `/hr/org-chart` recursive manager tree; legacy HR сохранён в `/hr/documents`.
+- TASK-019: `/hr/leaves`, заявки/рабочие дни/решения менеджера и глобальный pending badge.
+- TASK-020: `/hr/[id]`, профиль/контакты/ссылки на документы, ручной годовой лимит и Reporting to.
+- TASK-021: `/projects`, нормализованные task Kanban/List и shared CRM DnD; прежний реестр в `/projects/documents`.
+- TASK-022: `/projects/overview`, progress/budget/team, настройки проекта и календарный timeline на CSS Grid; расходы с tenant-safe projectId.
+- TASK-023: `/`, нормализованная сводка Finance/CRM/Inventory/HR, графики/счета/действия; расширенный Finance обзор в `/finance/dashboard`.
 
 Реализованы исходники, миграция и bootstrap; фактические результаты проверок фиксируются в `verification.md`.
 
@@ -85,6 +103,20 @@
 - Без номера: перевод прежней таблицы сделок на нормализованную модель/пагинацию, серверная пагинация остальных модулей, SQL aggregation остальных operational-модулей, ограничения объёмов.
 - Без номера: Payment allocations, налоговый учёт, возвраты и бухгалтерский ledger.
 - Без номера: резервы, партии и оценка запасов; склады/движения и транзакционные остатки реализованы TASK-016.
-- Без номера: кадровые документы, отпуска и payroll по требованиям бизнеса (предварительный номер TASK-012 заменён пользовательской задачей Finance Payments).
+- Без номера: кадровые файлы/доступ, начисления/перенос остатков/праздники и payroll по требованиям бизнеса (предварительный номер TASK-012 заменён пользовательской задачей Finance Payments).
 - Без номера: event outbox, workflow engine, пользовательские DocType (предварительный номер TASK-013 заменён пользовательской задачей Finance Expenses).
 - CHECKPOINT-002: доменные интеграционные проверки, нагрузка и восстановление из backup.
+
+
+## Новая очередь пользователя — ещё не реализовано
+
+- TASK-024: Settings Users — участники, приглашения, роли ADMIN+, деактивация/восстановление, последние 100 audit событий.
+- TASK-025: DB Settings singleton — компания/логотип/валюта/часовой пояс/формат дат, глобальный Context, настройки уведомлений.
+- CHECKPOINT-04: TASK-018—025 после реализации Settings; build/tsc/RBAC/audit.
+- TASK-026: loading/error/empty/mobile/shortcuts/анимации — финальная проверка и доработка.
+- TASK-027: итоговый faker seed и Docker app/PostgreSQL 16.
+- TASK-028: финальные ADR-001—010, зависимости, RBAC и guide нового модуля.
+- TASK-029: итоговый журнал CONTRA-NNN.
+- TASK-030: Developer Guide, CHECKPOINT-05, релиз/PR/merge/tag v1.0.0 только после прохождения финального checkpoint. Текущий commit/push не означает завершение релиза.
+
+**Локализация EN/RU:** английский по умолчанию, русский через Settings, общие каталоги/форматтеры, ошибки, PDF и CSV. Отчёт: [LOCALIZATION.md](LOCALIZATION.md).

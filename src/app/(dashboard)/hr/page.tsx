@@ -1,4 +1,6 @@
-import { ModulePage } from "@/components/blocks/module-page";
+import { getEmployees, getEmployeeDepartments } from "@/modules/hr/queries";
+import { EmployeeDirectory } from "@/modules/hr/components/employee-directory";
+import { HrNavigation } from "@/modules/hr/components/employee-presentation";
 
-/** Load the authenticated hr workspace. */
-export default function Page() { return <ModulePage domain="hr" />; }
+/** Load the normalized directory and department filters in parallel. */
+export default async function Page() { const [employees, departments] = await Promise.all([getEmployees({ pageSize: 12 }), getEmployeeDepartments()]); return <><HrNavigation /><EmployeeDirectory initialData={employees} initialDepartments={departments} /></>; }

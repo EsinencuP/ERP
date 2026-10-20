@@ -1,3 +1,4 @@
+import { localizeResult } from "@/i18n/server";
 import { NextResponse } from "next/server";
 import { serializeCsv } from "@/lib/export";
 import { err } from "@/lib/errors";
@@ -8,9 +9,9 @@ import type { AppError } from "@/types/shared";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const privateHeaders = { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" };
-function handleError(result: { ok: false; error: AppError }) {
+async function handleError(result: { ok: false; error: AppError }) {
   const status = result.error.code === "UNAUTHORIZED" ? 401 : result.error.code === "FORBIDDEN" ? 403 : result.error.code === "VALIDATION" ? 400 : 503;
-  return NextResponse.json(result, { status, headers: privateHeaders });
+  return NextResponse.json(await localizeResult(result), { status, headers: privateHeaders });
 }
 
 /** Download a fresh tenant-scoped P&L CSV; reject unknown/duplicate query keys and enforce live canExport. */

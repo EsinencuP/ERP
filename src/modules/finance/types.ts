@@ -22,7 +22,7 @@ export type PaymentRow = InvoicePayment & { invoiceId: string; invoiceNumber: st
 export type ExpenseCategory = z.infer<typeof import("./schema").expenseCategorySchema>;
 export type ExpenseInput = z.input<typeof import("./schema").expenseSchema>;
 export type ExpenseFilters = z.input<typeof import("./schema").expenseFiltersSchema>;
-export type Expense = { id: string; workspaceId: string; createdById: string | null; title: string; amount: string; currency: string; category: ExpenseCategory; date: string; receipt: string | null; notes: string | null; version: number; createdAt: string; updatedAt: string };
+export type Expense = { id: string; projectId: string | null; workspaceId: string; createdById: string | null; title: string; amount: string; currency: string; category: ExpenseCategory; date: string; receipt: string | null; notes: string | null; version: number; createdAt: string; updatedAt: string };
 export type FinanceDashboardData = {
   currency: FinanceCurrency;
   asOf: string;

@@ -1,3 +1,4 @@
+import { DEFAULT_LOCALE, intlLocale, type Locale } from "@/i18n/config";
 import type { StockStatus } from "./types";
 
 /** Convert an exact nonnegative decimal quantity to thousandths without floating-point arithmetic. */
@@ -9,8 +10,8 @@ export function milliToStock(value: bigint): string { const absolute = value < 0
 /** Derive availability from total physical stock and the product's own threshold. */
 export function getStockStatus(stock: string, minStock: string): StockStatus { const qty = stockToMilli(stock); return qty === 0n ? "out_of_stock" : qty <= stockToMilli(minStock) ? "low_stock" : "in_stock"; }
 /** Display exact quantities, including totals larger than the safe integer range. */
-export function formatStockQuantity(value: string): string {
+export function formatStockQuantity(value: string, locale: Locale = DEFAULT_LOCALE): string {
   if (!/^-?\d+(\.\d{1,3})?$/.test(value)) return "—";
   const negative = value.startsWith("-"), [whole = "0", fraction = ""] = (negative ? value.slice(1) : value).split("."); const decimals = fraction.replace(/0+$/, "");
-  return (negative ? "-" : "") + new Intl.NumberFormat("ru-RU").format(BigInt(whole)) + (decimals ? `,${decimals}` : "");
+  return (negative ? "-" : "") + new Intl.NumberFormat(intlLocale(locale)).format(BigInt(whole)) + (decimals ? `${locale === "ru" ? "," : "."}${decimals}` : "");
 }

@@ -1,6 +1,6 @@
 # Evo ERP Template
 
-Локальный модульный ERP-шаблон на Next.js 15, TypeScript, Tailwind CSS, Prisma и PostgreSQL. Интерфейс на русском: обзор, CRM, финансы, склад, команда, проекты, настройки и вход.
+Локальный модульный ERP-шаблон на Next.js 15, TypeScript, Tailwind CSS, Prisma и PostgreSQL. Английский интерфейс по умолчанию; полный русский перевод включается тумблером Language в Settings. Модули: обзор, CRM, финансы, склад, команда, проекты, настройки и вход.
 
 ## Быстрый старт: демонстрация
 
@@ -82,3 +82,16 @@ Production-проект: `erp`, домен https://erp-xi-pink.vercel.app, GitHu
 Это исходная основа ERP, а не готовая бухгалтерская или кадровая система. Расчёт налога в счетах и складские движения реализованы; налоговый учёт, проводки, резервы/партии, кадровый документооборот, динамические роли, пользовательские DocType и workflow engine запланированы отдельно. Перед внешним production-развёртыванием нужны CHECKPOINT на PostgreSQL, ограничение частоты входа, управление пользователями и резервное копирование.
 
 TASK-002 добавляет нормализованные Prisma-модели всех пяти доменов, AUTH, workspace/member, tenant-FK, индексы и CHECK-ограничения. Связи и единицы измерения описаны в `docs/modules/database.md`. Нормализованные CRM и Invoice уже имеют отдельные UI и доменные сервисы. Прежний Document-слой сохранён отдельно; автоматический перенос данных не выполняется. Миграции применять через `db:migrate`/`prisma migrate dev`, чтобы сохранить SQL-проверки, не представимые в Prisma schema.
+
+
+HR: `/hr` — Employee directory с Grid/List, поиском, отделами и профилями. `/hr/org-chart` — рекурсивная оргструктура через руководителей, до 2000 узлов. Прежние HR-документы сохранены в `/hr/documents`. Реализация и проверки: `docs/TASK-018.md`.
+
+HR Leave Management: `/hr/leaves` — заявки, рабочие дни без выходных, решения MANAGER/ADMIN/SUPER_ADMIN и pending badge в sidebar. Проверки и границы: `docs/TASK-019.md`.
+
+HR Employee Profile: `/hr/[id]` — данные/контакты/ссылки на документы, руководитель и календарный баланс ежегодного отпуска. Годовой лимит задаёт менеджер вручную; до назначения «Не задан». Миграция `20261019000400_employee_profile`; границы и проверки: `docs/TASK-020.md`.
+
+Projects Tasks: `/projects` — Task Kanban TODO/IN_PROGRESS/IN_REVIEW/DONE и TanStack List, общие фильтры, приоритеты/исполнители/сроки и versioned task CRUD. Общие DnD hook/factory используются также CRM; прежний реестр — `/projects/documents`. Миграция REVIEW → IN_REVIEW сохраняет записи. Проверки: `docs/TASK-021.md`.
+
+Projects Overview: `/projects/overview` — прогресс DONE/total, затраты по связанным Expense в валюте бюджета, руководитель/команда и календарный timeline на CSS Grid. Настройки проекта, фильтры и переходы к его задачам/расходам. Старые расходы остаются без проекта; миграция `20261019000600_project_expenses` добавляет tenant-safe связь. Проверки: `docs/TASK-022.md`.
+
+Main Dashboard: `/` — Revenue/Open Deals/Low Stock/HR Pending, два графика, пять счетов, audit feed и условный баннер пополнения. Server Component загружает нормализованные данные через Promise.all без кэша. Полный финансовый обзор с aging/top clients/CSV сохранён на `/finance/dashboard`. Проверки: `docs/TASK-023.md`, определения: `docs/modules/dashboard.md`.

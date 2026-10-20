@@ -106,7 +106,7 @@ TASK-016: Serializable movement service реализует атомарные п
 | LeaveType | ANNUAL, SICK, UNPAID, PARENTAL, OTHER |
 | LeaveStatus | PENDING, APPROVED, REJECTED, CANCELLED |
 | ProjectStatus | PLANNING, ACTIVE, ON_HOLD, COMPLETED, CANCELLED |
-| TaskStatus | TODO, IN_PROGRESS, REVIEW, DONE, CANCELLED |
+| TaskStatus | TODO, IN_PROGRESS, IN_REVIEW, DONE, CANCELLED |
 | Priority | LOW, MEDIUM, HIGH, URGENT |
 
 ## Индексы, удаление и контроль версий
@@ -158,3 +158,16 @@ Invoice → InvoiceItem/Payment сохраняет составные tenant FK.
 Additive migration `20261019000100_finance_expenses` создаёт ExpenseCategory (OFFICE/SOFTWARE/TRAVEL/MARKETING/EQUIPMENT/RENT/UTILITIES/OTHER) и Expense: title VARCHAR(200), amount Decimal(20,0) в целых копейках, currency CHAR(3), category enum, DATE date, nullable receipt VARCHAR(2048)/notes, version и audit timestamps. Expense.workspaceId → Workspace Restrict; (createdById, workspaceId) → Membership(userId, workspaceId) Restrict. Уникальный (id, workspaceId), индексы workspace/date/createdAt/id, workspace/category/date и workspace/creator.
 
 CHECK в SQL, не заменяемые Prisma schema: title не пуст, amount/version >0, RUB/USD/EUR, date 0001–9999, notes до 10000, nullable canonical http(s) receipt без credentials/пробелов. Серверная Zod-проверка URL строже и нормализует URL. Каждый update/delete сверяет version; Expense и AuditLog Expense before/after записываются атомарно. Данные существующих таблиц не переносятся и не изменяются миграцией.
+
+
+## Employee profile — TASK-020
+
+Additive migration `20261019000400_employee_profile`: EmployeeDocumentLink (workspace/employee, title VARCHAR(200), url VARCHAR(2048), notes VARCHAR(2000), version, timestamps) и LeaveAllowance (workspace/employee, year, days Decimal(6,2), version, timestamps). Composite FK к Employee(id,workspaceId) и FK к Workspace — RESTRICT. Allowance уникален по workspace/employee/year; CHECK year 1900…9999, целые days 0…9999, version >0. Document CHECK nonempty title, http(s) URL и version >0; более строгая безопасная URL-валидация выполняется сервером и перед рендером. Document list index workspace/employee/createdAt/id, unique id/workspace для обеих моделей. Данные Employee/Leave не переписываются. Allowance хранит явную кадровую настройку, без правового default или автоматического начисления.
+
+## Projects tasks — TASK-021
+
+Migration `20261019000500_task_review_status`: ALTER TYPE TaskStatus RENAME VALUE REVIEW TO IN_REVIEW, сохраняет id/version/relations всех прежних задач. Четыре рабочих статуса и CANCELLED для read-only истории. Модели/поля/FK Task и Project не изменены.
+
+## Project budget usage — TASK-022
+
+Migration `20261019000600_project_expenses`: nullable Expense.projectId TEXT, index (workspaceId,projectId,currency), composite FK (projectId,workspaceId) → Project(id,workspaceId), ON DELETE RESTRICT/ON UPDATE CASCADE. Старые расходы не привязываются автоматически, новые модели не создаются. Project.budget остаётся Decimal(20,0) в копейках; usage derived из расходов той же валюты, другие валюты отдельно.

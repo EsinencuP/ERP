@@ -1,4 +1,6 @@
 "use client";
+import { useI18n } from "@/i18n/use-i18n";
+
 
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import type { z } from "zod";
@@ -27,6 +29,8 @@ type ContactFormSheetProps = {
 
 /** Create or edit a contact in a non-modal sheet with blur validation and scoped keyboard shortcuts. */
 export function ContactFormSheet({ contact, disabled, onSave, onClose, onReload, onReturnFocus }: ContactFormSheetProps) {
+  const { t } = useI18n();
+
   const id = useId();
   const opener = useRef<HTMLElement | null>(null);
   const submitting = useRef(false);
@@ -46,15 +50,15 @@ export function ContactFormSheet({ contact, disabled, onSave, onClose, onReload,
       const result = await onSave(input);
       if (!result.ok) {
         setError(result.error.message); setNeedsReload(result.error.code !== "VALIDATION");
-        toast.error(result.error.message); return;
+        toast.error(t(result.error.message)); return;
       }
-      toast.success(contact ? "Контакт обновлён" : "Контакт создан"); onClose();
+      toast.success(t(contact ? t("Контакт обновлён") : t("Контакт создан"))); onClose();
     } catch {
-      const message = "Результат сохранения не подтверждён. Обновите контакты и проверьте запись перед повтором";
-      setError(message); setNeedsReload(true); toast.error(message);
+      const message = t("Результат сохранения не подтверждён. Обновите контакты и проверьте запись перед повтором");
+      setError(message); setNeedsReload(true); toast.error(t(message));
     } finally { submitting.current = false; }
   }
-  function handleInvalid() { toast.error("Проверьте поля формы"); }
+  function handleInvalid() { toast.error(t("Проверьте поля формы")); }
   function handleShortcut(event: KeyboardEvent<HTMLFormElement>) {
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.nativeEvent.isComposing) {
       event.preventDefault(); if (!event.repeat && !locked && !submitting.current) event.currentTarget.requestSubmit();
@@ -68,22 +72,22 @@ export function ContactFormSheet({ contact, disabled, onSave, onClose, onReload,
       onEscapeKeyDown={function handleEscape(event) { if (submitting.current || pending) event.preventDefault(); }}
       onOpenAutoFocus={function handleOpenFocus(event) { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; event.preventDefault(); form.setFocus("name"); }}
       onCloseAutoFocus={function handleCloseFocus(event) { event.preventDefault(); if (onReturnFocus) onReturnFocus(); else if (opener.current?.isConnected) opener.current.focus({ preventScroll: true }); }}>
-      <SheetHeader className="border-b px-6 py-6 text-left"><p className="eyebrow text-muted-foreground">CRM / Контакты</p><SheetTitle className="pr-7">{contact ? "Редактировать контакт" : "Новый контакт"}</SheetTitle><SheetDescription>{contact ? "Изменения сохранятся в карточке контакта." : "Таблица остаётся доступной. Сохраните изменения, когда будете готовы."}</SheetDescription></SheetHeader>
+      <SheetHeader className="border-b px-6 py-6 text-left"><p className="eyebrow text-muted-foreground">{t("CRM / Контакты")}</p><SheetTitle className="pr-7">{contact ? t("Редактировать контакт") : t("Новый контакт")}</SheetTitle><SheetDescription>{contact ? t("Изменения сохранятся в карточке контакта.") : t("Таблица остаётся доступной. Сохраните изменения, когда будете готовы.")}</SheetDescription></SheetHeader>
       <form className="flex min-h-0 flex-1 flex-col" onSubmit={form.handleSubmit(handleSubmit, handleInvalid)} onKeyDown={handleShortcut} noValidate aria-busy={pending}>
         <div className="relative min-h-0 flex-1 overflow-y-auto px-6 py-6">
-          <fieldset disabled={locked} className="grid gap-5 sm:grid-cols-2"><legend className="sr-only">Данные контакта</legend>
-            {([{ key: "name", label: "Имя", type: "text", max: 160, autoComplete: "name" }, { key: "company", label: "Компания", type: "text", max: 200, autoComplete: "organization" }, { key: "email", label: "Email", type: "email", max: 200, autoComplete: "email" }, { key: "phone", label: "Телефон", type: "tel", max: 64, autoComplete: "tel" }, { key: "address", label: "Адрес", type: "text", max: 1000, autoComplete: "street-address" }] as const).map((field) => <div key={field.key} className={field.key === "address" ? "sm:col-span-2" : ""}>
-              <label className="mb-2 block text-xs font-medium" htmlFor={`${id}-${field.key}`}>{field.label}{field.key === "name" ? " *" : ""}</label>
+          <fieldset disabled={locked} className="grid gap-5 sm:grid-cols-2"><legend className="sr-only">{t("Данные контакта")}</legend>
+            {([{ key: "name", label: t("Имя"), type: "text", max: 160, autoComplete: "name" }, { key: "company", label: t("Компания"), type: "text", max: 200, autoComplete: "organization" }, { key: "email", label: t("Email"), type: "email", max: 200, autoComplete: "email" }, { key: "phone", label: t("Телефон"), type: "tel", max: 64, autoComplete: "tel" }, { key: "address", label: t("Адрес"), type: "text", max: 1000, autoComplete: "street-address" }] as const).map((field) => <div key={field.key} className={field.key === "address" ? "sm:col-span-2" : ""}>
+              <label className="mb-2 block text-xs font-medium" htmlFor={`${id}-${field.key}`}>{t(field.label)}{field.key === "name" ? " *" : ""}</label>
               <Input id={`${id}-${field.key}`} type={field.type} maxLength={field.max} autoComplete={field.autoComplete} {...form.register(field.key)} aria-required={field.key === "name"} aria-invalid={Boolean(form.formState.errors[field.key])} aria-describedby={form.formState.errors[field.key] ? `${id}-error-${field.key}` : undefined} />
-              {form.formState.errors[field.key] && <p role="alert" className="mt-1.5 text-xs text-destructive" id={`${id}-error-${field.key}`}>{form.formState.errors[field.key]?.message}</p>}
+              {form.formState.errors[field.key] && <p role="alert" className="mt-1.5 text-xs text-destructive" id={`${id}-error-${field.key}`}>{t(form.formState.errors[field.key]?.message)}</p>}
             </div>)}
-            <div className="sm:col-span-2"><label htmlFor={`${id}-stage`} className="mb-2 block text-xs font-medium">Этап</label><select id={`${id}-stage`} className="input w-full" {...form.register("stage")} aria-invalid={Boolean(form.formState.errors.stage)} aria-describedby={form.formState.errors.stage ? `${id}-error-stage` : undefined}>{CONTACT_STAGES.map((stage) => <option key={stage} value={stage}>{CONTACT_STAGE_LABELS[stage]}</option>)}</select>{form.formState.errors.stage && <p role="alert" id={`${id}-error-stage`} className="mt-1.5 text-xs text-destructive">{form.formState.errors.stage.message}</p>}</div>
-            <div className="sm:col-span-2"><label htmlFor={`${id}-notes`} className="mb-2 block text-xs font-medium">Комментарий</label><Textarea id={`${id}-notes`} rows={4} maxLength={10000} {...form.register("notes")} aria-invalid={Boolean(form.formState.errors.notes)} aria-describedby={form.formState.errors.notes ? `${id}-error-notes` : undefined} />{form.formState.errors.notes && <p role="alert" id={`${id}-error-notes`} className="mt-1.5 text-xs text-destructive">{form.formState.errors.notes.message}</p>}</div>
+            <div className="sm:col-span-2"><label htmlFor={`${id}-stage`} className="mb-2 block text-xs font-medium">{t("Этап")}</label><select id={`${id}-stage`} className="input w-full" {...form.register("stage")} aria-invalid={Boolean(form.formState.errors.stage)} aria-describedby={form.formState.errors.stage ? `${id}-error-stage` : undefined}>{CONTACT_STAGES.map((stage) => <option key={stage} value={stage}>{t(CONTACT_STAGE_LABELS[stage])}</option>)}</select>{form.formState.errors.stage && <p role="alert" id={`${id}-error-stage`} className="mt-1.5 text-xs text-destructive">{t(form.formState.errors.stage.message)}</p>}</div>
+            <div className="sm:col-span-2"><label htmlFor={`${id}-notes`} className="mb-2 block text-xs font-medium">{t("Комментарий")}</label><Textarea id={`${id}-notes`} rows={4} maxLength={10000} {...form.register("notes")} aria-invalid={Boolean(form.formState.errors.notes)} aria-describedby={form.formState.errors.notes ? `${id}-error-notes` : undefined} />{form.formState.errors.notes && <p role="alert" id={`${id}-error-notes`} className="mt-1.5 text-xs text-destructive">{t(form.formState.errors.notes.message)}</p>}</div>
           </fieldset>
-          {error && <div role="alert" className="mt-5 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">{error}{needsReload && <p className="mt-2">Перед повторной записью закройте форму и обновите данные.</p>}</div>}
-          {needsReload && <Button type="button" variant="outline" className="mt-3" disabled={pending} onClick={function handleReload() { onClose(); onReload(); }}>Закрыть и обновить</Button>}
+          {error && <div role="alert" className="mt-5 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">{t(error)}{needsReload && <p className="mt-2">{t("Перед повторной записью закройте форму и обновите данные.")}</p>}</div>}
+          {needsReload && <Button type="button" variant="outline" className="mt-3" disabled={pending} onClick={function handleReload() { onClose(); onReload(); }}>{t("Закрыть и обновить")}</Button>}
         </div>
-        <footer className="border-t px-6 py-4"><p className="mb-4 text-[11px] text-muted-foreground">⌘ / Ctrl + Enter — сохранить · Esc — закрыть</p><div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={pending} onClick={handleClose}>Отмена</Button><Button type="submit" disabled={locked}>{pending && <Spinner />}{pending ? "Сохранение…" : "Сохранить контакт"}</Button></div></footer>
+        <footer className="border-t px-6 py-4"><p className="mb-4 text-[11px] text-muted-foreground">{t("⌘ / Ctrl + Enter — сохранить · Esc — закрыть")}</p><div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={pending} onClick={handleClose}>{t("Отмена")}</Button><Button type="submit" disabled={locked}>{pending && <Spinner />}{pending ? t("Сохранение…") : t("Сохранить контакт")}</Button></div></footer>
       </form>
     </SheetContent>
   </Sheet>;

@@ -109,7 +109,7 @@ enum ProjectStatus {
 enum TaskStatus {
   TODO
   IN_PROGRESS
-  REVIEW
+  IN_REVIEW
   DONE
   CANCELLED
 }
@@ -144,6 +144,8 @@ model Workspace {
   stockItems       StockItem[]
   stockMovements   StockMovement[]
   employees        Employee[]
+  employeeDocumentLinks EmployeeDocumentLink[]
+  leaveAllowances LeaveAllowance[]
   leaves           Leave[]
   projects         Project[]
   tasks            Task[]
@@ -414,6 +416,7 @@ model Expense {
   id          String          @id @default(cuid())
   workspaceId String
   createdById String?
+  projectId   String?
   title       String          @db.VarChar(200)
   amount      Decimal         @db.Decimal(20, 0)
   currency    String          @default("RUB") @db.Char(3)
@@ -426,11 +429,13 @@ model Expense {
   updatedAt   DateTime        @default(now()) @updatedAt @db.Timestamptz(3)
   workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
   createdBy   Membership?     @relation("ExpenseCreator", fields: [createdById, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+  project     Project?        @relation(fields: [projectId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
 
   @@unique([id, workspaceId])
   @@index([workspaceId, date, createdAt, id])
   @@index([workspaceId, category, date])
   @@index([workspaceId, createdById])
+  @@index([workspaceId, projectId, currency])
 }
 
 // Inventory. One exact stock balance per product and warehouse.
@@ -544,12 +549,45 @@ model Employee {
   manager     Employee?      @relation("EmployeeManager", fields: [managerId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
   reports     Employee[]     @relation("EmployeeManager")
   leaves      Leave[]
+  documentLinks EmployeeDocumentLink[]
+  leaveAllowances LeaveAllowance[]
 
   @@unique([id, workspaceId])
   @@unique([workspaceId, employeeId])
   @@unique([userId, workspaceId])
   @@index([workspaceId, status])
   @@index([workspaceId, managerId])
+}
+
+model EmployeeDocumentLink {
+  id String @id @default(cuid())
+  workspaceId String
+  employeeId String
+  title String @db.VarChar(200)
+  url String @db.VarChar(2048)
+  notes String? @db.VarChar(2000)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  employee Employee @relation(fields: [employeeId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  @@unique([id, workspaceId])
+  @@index([workspaceId, employeeId, createdAt, id])
+}
+
+model LeaveAllowance {
+  id String @id @default(cuid())
+  workspaceId String
+  employeeId String
+  year Int
+  days Decimal @db.Decimal(6, 2)
+  version Int @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  employee Employee @relation(fields: [employeeId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  @@unique([id, workspaceId])
+  @@unique([workspaceId, employeeId, year])
 }
 
 model Leave {
@@ -597,6 +635,7 @@ model Project {
   manager     Membership?   @relation("ProjectManager", fields: [managerId, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
   tasks       Task[]
   invoices    Invoice[]
+  expenses    Expense[]
 
   @@unique([id, workspaceId])
   @@unique([workspaceId, code])

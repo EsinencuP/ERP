@@ -20,6 +20,9 @@ export function hasPermission(role: Role | null | undefined, permission: Permiss
 /** All authenticated workspace roles except READONLY may create and update documents. */
 export function canWrite(role: Role | null | undefined): boolean { return isRole(role) && role !== "READONLY"; }
 
+/** Allow workspace leave decisions and their pending counter only to managers and administrators. */
+export function canApproveLeave(role: Role | null | undefined): boolean { return role === "MANAGER" || role === "ADMIN" || role === "SUPER_ADMIN"; }
+
 /** Keep the existing additional HR deletion restriction for managers. */
 export function canDeleteDocument(role: Role | null | undefined, domain: Domain): boolean {
   return hasPermission(role, "canDelete") && !(role === "MANAGER" && domain === "hr");

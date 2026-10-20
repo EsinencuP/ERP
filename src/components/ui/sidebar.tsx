@@ -1,4 +1,6 @@
 "use client"
+import { useI18n } from "@/i18n/use-i18n";
+
 
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
@@ -197,6 +199,8 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
+  const { t } = useI18n();
+
     const { isMobile, state, openMobile, setOpenMobile } = useSidebarContext()
 
     if (collapsible === "none") {
@@ -229,8 +233,8 @@ const Sidebar = React.forwardRef<
             side={side}
           >
             <SheetHeader className="sr-only">
-              <SheetTitle>Навигация</SheetTitle>
-              <SheetDescription>Разделы рабочего пространства</SheetDescription>
+              <SheetTitle>{t("Навигация")}</SheetTitle>
+              <SheetDescription>{t("Разделы рабочего пространства")}</SheetDescription>
             </SheetHeader>
             <div className="flex h-full w-full flex-col">{children}</div>
           </SheetContent>
@@ -290,6 +294,8 @@ const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
+  const { t } = useI18n();
+
   const { toggleSidebar } = useSidebarContext()
 
   return (
@@ -306,7 +312,7 @@ const SidebarTrigger = React.forwardRef<
       {...props}
     >
       <PanelLeft />
-      <span className="sr-only">Toggle Sidebar</span>
+      <span className="sr-only">{t("Toggle Sidebar")}</span>
     </Button>
   )
 })
@@ -317,16 +323,18 @@ const SidebarRail = React.forwardRef<
   HTMLButtonElement,
   React.ComponentProps<"button">
 >(({ className, ...props }, ref) => {
+  const { t } = useI18n();
+
   const { toggleSidebar } = useSidebarContext()
 
   return (
     <button
       ref={ref}
       data-sidebar="rail"
-      aria-label="Toggle Sidebar"
+      aria-label={t("Toggle Sidebar")}
       tabIndex={-1}
       onClick={toggleSidebar}
-      title="Toggle Sidebar"
+      title={t("Toggle Sidebar")}
       className={cn("motion-fade",
         "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex",
         "[[data-side=left]_&]:cursor-w-resize [[data-side=right]_&]:cursor-e-resize",

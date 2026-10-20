@@ -1,6 +1,7 @@
+import { DEFAULT_LOCALE, intlLocale, type Locale } from "@/i18n/config";
 import { clsx, type ClassValue } from "clsx";
 import { format as formatDateValue, isValid, parseISO } from "date-fns";
-import { ru } from "date-fns/locale";
+import { enUS, ru } from "date-fns/locale";
 import { twMerge } from "tailwind-merge";
 
 const graphemeSegmenter = new Intl.Segmenter("ru", { granularity: "grapheme" });
@@ -9,30 +10,30 @@ const graphemeSegmenter = new Intl.Segmenter("ru", { granularity: "grapheme" });
 export function cn(...inputs: ClassValue[]): string { return twMerge(clsx(inputs)); }
 
 /** Format integer minor units exactly (including Decimal strings); invalid input returns an em dash. */
-export function formatCurrency(amount: number | bigint | string, currency = "RUB"): string {
+export function formatCurrency(amount: number | bigint | string, currency = "RUB", locale: Locale = DEFAULT_LOCALE): string {
   if (typeof amount === "number" && !Number.isSafeInteger(amount)) return "—";
   if (typeof amount === "string" && !/^-?\d+$/.test(amount)) return "—";
   if (!/^[a-z]{3}$/i.test(currency)) return "—";
   try {
     const value = BigInt(amount);
     const code = currency.toUpperCase();
-    const digits = new Intl.NumberFormat("ru-RU", { style: "currency", currency: code }).resolvedOptions().maximumFractionDigits ?? 2;
+    const digits = new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: code }).resolvedOptions().maximumFractionDigits ?? 2;
     const scale = 10n ** BigInt(digits);
     const absolute = value < 0n ? -value : value;
     const whole = absolute / scale;
     const fraction = absolute % scale;
     const signedWhole = value < 0n ? whole === 0n ? -0 : -whole : whole;
-    const formatter = new Intl.NumberFormat("ru-RU", { style: "currency", currency: code, minimumFractionDigits: fraction === 0n ? 0 : digits, maximumFractionDigits: digits });
+    const formatter = new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: code, minimumFractionDigits: fraction === 0n ? 0 : digits, maximumFractionDigits: digits });
     return formatter.formatToParts(signedWhole).map((part) => part.type === "fraction" ? fraction.toString().padStart(digits, "0") : part.value).join("");
   } catch { return "—"; }
 }
 
 /** Format an ISO date or Date with date-fns tokens and Russian locale in the runtime timezone. */
-export function formatDate(date: string | Date | number, format = "dd.MM.yyyy"): string {
+export function formatDate(date: string | Date | number, format?: string, locale: Locale = DEFAULT_LOCALE): string {
   if (date === "") return "—";
   try {
     const value = typeof date === "string" ? parseISO(date) : new Date(date);
-    return isValid(value) ? formatDateValue(value, format, { locale: ru }) : "—";
+    return isValid(value) ? formatDateValue(value, format ?? (locale === "ru" ? "dd.MM.yyyy" : "MMM d, yyyy"), { locale: locale === "ru" ? ru : enUS }) : "—";
   } catch { return "—"; }
 }
 
@@ -54,17 +55,17 @@ export function truncate(value: string, maxLength = 80, suffix = "…"): string 
 }
 
 /** Format integer minor currency units as Russian rubles. */
-export function money(amount: number, compact = false): string {
-  if (!compact) return formatCurrency(amount);
+export function money(amount: number, compact = false, locale: Locale = DEFAULT_LOCALE): string {
+  if (!compact) return formatCurrency(amount, "RUB", locale);
   if (!Number.isSafeInteger(amount)) return "—";
-  return new Intl.NumberFormat("ru-RU", { style: "currency", currency: "RUB", minimumFractionDigits: 0, maximumFractionDigits: 1, notation: "compact" }).format(amount / 100);
+  return new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "RUB", minimumFractionDigits: 0, maximumFractionDigits: 1, notation: "compact" }).format(amount / 100);
 }
 
 /** Format a persisted ISO date without depending on the machine timezone. */
-export function dateLabel(value: string): string {
+export function dateLabel(value: string, locale: Locale = DEFAULT_LOCALE): string {
   if (!value) return "—";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "short", timeZone: "Europe/Moscow" }).format(date);
+  return Number.isNaN(date.getTime()) ? "—" : new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", timeZone: "Europe/Moscow" }).format(date);
 }
 
 /** Produce a short avatar label from a person's or company's name. */

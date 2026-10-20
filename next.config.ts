@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
 
 const config: NextConfig = {
   poweredByHeader: false,
@@ -6,4 +7,4 @@ const config: NextConfig = {
   outputFileTracingIncludes: { "/api/finance/invoices/*/pdf": ["./public/fonts/**", "./src/app/globals.css"] },
 };
 
-export default config;
+export default createNextIntlPlugin()(config);
