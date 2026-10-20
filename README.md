@@ -2,7 +2,7 @@
 
 A workspace-scoped ERP built with Next.js, React, Prisma and PostgreSQL: CRM, Finance, Inventory, HR and Projects, with Settings/RBAC and a shared dashboard.
 
-Start with the [Developer Guide](INSTRUCTIONS.md): setup, Docker, environment variables, module examples, Server Actions, all ten architecture laws and known limitations.
+Start with the [User Guide](INSTRUCTIONS.md) for daily ERP workflows, module responsibilities and permissions. Read it online at [User Guide](https://erp-xi-pink.vercel.app/user-guide.html). Technical setup, module examples and the ten architecture laws are in the separate [Developer Guide](docs/DEVELOPER_GUIDE.md).
 
 ## Run the sample
 
@@ -19,7 +19,7 @@ Keep an existing `.env`. Open http://localhost:3000/login — admin@erp.dev / Ad
 ## Documentation
 
 - [Architecture: ADR-001—010, dependencies, RBAC](docs/architecture.md)
-- [Developer Guide and contribution rules](INSTRUCTIONS.md)
+- [User Guide](INSTRUCTIONS.md) and [developer/contribution rules](docs/DEVELOPER_GUIDE.md)
 - [Requirement clarifications](docs/contradictions.md)
 - [Task status](docs/roadmap.md) and [verification history](docs/verification.md)
 - [Docker/sample initialization evidence](docs/TASK-027.md)

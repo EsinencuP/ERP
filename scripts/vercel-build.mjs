@@ -1,10 +1,10 @@
 import { spawn } from "node:child_process";
 
 /** Run a local build tool without shell interpolation or exposing environment values. */
-function runTool(label, args) {
+function runTool(label, args, extraEnv = {}) {
   console.info(label);
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, args, { stdio: "inherit", windowsHide: true });
+    const child = spawn(process.execPath, args, { stdio: "inherit", windowsHide: true, env: { ...process.env, ...extraEnv } });
     child.once("error", () => resolve({ ok: false, error: { code: "CONFIGURATION", message: `${label}: не удалось запустить процесс` } }));
     child.once("exit", (code) => resolve(code === 0 ? { ok: true, data: true } : { ok: false, error: { code: "CONFIGURATION", message: `${label}: команда завершилась с ошибкой` } }));
   });
@@ -24,14 +24,15 @@ async function handleBuild() {
   const steps = [["Prisma Client", ["node_modules/prisma/build/index.js", "generate"]]];
   if (production) {
     steps.push(["Production migrations", ["node_modules/prisma/build/index.js", "migrate", "deploy"]]);
-    if (process.env.SEED_ADMIN_EMAIL || process.env.SEED_ADMIN_PASSWORD) {
-      process.env.SEED_ONLY_IF_EMPTY = "true";
-      process.env.SEED_MODE = "bootstrap";
-      steps.push(["Administrator bootstrap", ["--import", "tsx", "prisma/seed.ts"]]);
+    if (process.env.SEED_PUBLIC_SAMPLE === "true") {
+      steps.push(["Public training sample", ["--import", "tsx", "prisma/seed.ts"], { SEED_MODE: "sample", SEED_ADMIN_EMAIL: "admin@erp.dev", SEED_ADMIN_PASSWORD: "Admin123!", SEED_WORKSPACE_NAME: "Evo Sample Company", SEED_ONLY_IF_EMPTY: "false" }]);
+    } else if (process.env.SEED_ADMIN_EMAIL || process.env.SEED_ADMIN_PASSWORD) {
+      steps.push(["Administrator bootstrap", ["--import", "tsx", "prisma/seed.ts"], { SEED_MODE: "bootstrap", SEED_ONLY_IF_EMPTY: "true" }]);
     }
   }
+  steps.push(["User guide", ["scripts/build-user-guide.mjs"]]);
   steps.push(["Next.js production build", ["node_modules/next/dist/bin/next", "build"]]);
-  for (const [label, args] of steps) { const result = await runTool(label, args); if (!result.ok) return result; }
+  for (const [label, args, extraEnv] of steps) { const result = await runTool(label, args, extraEnv); if (!result.ok) return result; }
   return { ok: true, data: true };
 }
 

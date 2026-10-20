@@ -1,0 +1,15 @@
+.git
+.vercel
+.data
+.data/**
+.env
+.env.*
+!.env.example
+node_modules
+.next
+.playwright-mcp
+playwright-artifacts
+*.tsbuildinfo
+npm-debug.log*
+docs/screenshots
+public/user-guide.html

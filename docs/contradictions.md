@@ -1,6 +1,6 @@
 # Журнал противоречий
 
-TASK-029, редакция 20.10.2026. Источник законов — [INSTRUCTIONS.md](../INSTRUCTIONS.md); действующие архитектурные решения — [architecture.md](architecture.md).
+TASK-029, редакция 20.10.2026. Источник законов — [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md); действующие архитектурные решения — [architecture.md](architecture.md).
 
 Формат записи: `[CONTRA-NNN] Дата | Закон A vs Закон B | Решение | Применено в TASK-NNN`.
 

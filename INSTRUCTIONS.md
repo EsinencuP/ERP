@@ -1,429 +1,276 @@
-# ERP Template — Developer Guide
+# Evo ERP — руководство пользователя
 
-Evo ERP is a workspace-scoped ERP template. Developers and coding agents must read this guide before making changes; all ten Architecture Laws below remain mandatory.
+Это инструкция для ежедневной работы в ERP: где найти нужный раздел, как вести клиентов, счета, склад, сотрудников и проекты, а также как управлять доступом команды.
 
-Sources: [architecture and ADRs](docs/architecture.md), [roadmap](docs/roadmap.md), [requirement clarifications](docs/contradictions.md), [verification evidence](docs/verification.md), [reference projects](docs/references.md). References inform patterns, not feature parity or permission to copy code without checking its license.
+Опубликованная система: [erp-xi-pink.vercel.app](https://erp-xi-pink.vercel.app). Названия кнопок приведены по-русски и, где полезно, по-английски. По умолчанию интерфейс английский; язык можно переключить в настройках.
 
-## Quick Start (5 минут)
+## 1. Первый вход и ориентация
 
-Prerequisites: Git, Node.js 24 LTS, npm, Docker Engine and Compose v2. The first build requires network access and may take longer than five minutes. In a **new checkout**, run:
+1. Откройте систему и введите email и пароль своего аккаунта.
+2. После входа откроется **Обзор / Dashboard** с показателями компании.
+3. Слева расположено меню: CRM, Финансы, Склад, Персонал, Проекты и Настройки. На телефоне откройте его кнопкой меню в верхнем левом углу.
+4. Название рабочего пространства в меню показывает, с какой компанией вы работаете. Данные разных пространств разделены.
+5. Для выхода нажмите **Выйти / Sign out**. Если доступ отозван или сессия истекла, войдите повторно либо обратитесь к администратору.
 
-```powershell
-npm ci
-Copy-Item .env.example .env
-node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64url'))"
-```
+### Учебный пример
 
-If `.env` already exists, keep it instead of overwriting it. Paste the generated secret into NEXTAUTH_SECRET in `.env`, then:
+Для знакомства с опубликованным учебным пространством используется **admin@erp.dev / Admin123!**. Это публичные учебные реквизиты, а не пароль вашей рабочей компании. В образце есть администратор и пять дополнительных участников, клиенты, сделки разных стадий, счета, склад, сотрудники, проекты и история действий.
 
-```powershell
-docker compose up --build -d
-docker compose run --rm seed
-```
+Имена, компании, суммы, последние входы и исторические события образца — искусственные учебные данные. Их назначение — показать, как выглядит заполненная ERP. Не вносите в общедоступное учебное пространство личные данные, реальные договоры или конфиденциальные документы. Другие посетители могут изменить учебные записи.
 
-Open [http://localhost:3000/login](http://localhost:3000/login). The explicitly imported sample account is **admin@erp.dev / Admin123!**. Ordinary app startup does not create it. The sample contains 20 contacts, 10 deals, 5 invoices, 15 products, 3 warehouses, 8 employees and 3 projects with tasks, plus supporting records.
+### Настроить интерфейс под себя
 
-English is the default language; select Russian in Settings. Business currency is EUR. For a real installation use bootstrap with custom credentials, as described below.
+- **Настройки → Язык / Settings → Language:** включите русский переключателем **Use Russian**. После перезагрузки язык применяется ко всем разделам, сообщениям, PDF и выгрузкам. Выбор сохраняется в этом браузере.
+- **Тема:** кнопка солнца/луны в верхней панели переключает светлую и тёмную тему.
+- **Поиск:** нажмите кнопку поиска или Cmd/Ctrl+K. Палитра помогает перейти к разделу или запустить доступное действие. Это не поиск по всем полям всех реестров.
+- **Новая запись:** Cmd/Ctrl+N открывает форму создания для текущего раздела, если у вас есть право. Например, в участниках открывается приглашение пользователя.
+- **Esc** закрывает меню, палитру и большинство открытых форм. Во время сохранения закрытие формы может быть временно заблокировано.
 
-## Tech Stack
+## 2. Что делает каждый модуль
 
-| Area | Implementation |
-| --- | --- |
-| Application | Next.js 15 App Router, React 19, TypeScript 5 |
-| Database | PostgreSQL; Prisma Client/CLI 6.19.3; SQL migrations |
-| Authentication | NextAuth 5.0.0-beta.32, Credentials/JWT, revocable server registry |
-| UI | Shadcn/Radix, Tailwind 3, semantic CSS variables, Geist Sans/Mono, Sonner |
-| Forms | React Hook Form, Zod |
-| Data interfaces | TanStack Table, DnD Kit and shared Kanban hooks |
-| Reporting | Recharts, @react-pdf/renderer, CSV Route Handlers |
-| Localization/dates | next-intl, date-fns, workspace-aware formatters |
-| Initialization/containers | Faker sample seed; Node 24 Debian slim; postgres:16-alpine |
-
-The lockfile defines exact versions. Use npm ci; major upgrades require separate validation. NextAuth v5 is a pinned beta. Docker uses PostgreSQL 16; earlier checks also used PostgreSQL 17, whose data directory cannot be mounted into a PostgreSQL 16 container.
-
-## Environment Setup (.env variables)
-
-`.env.example` is the committed template. `.env`, `.env.local`, `.data/`, credentials and database files are ignored. Never publish secrets or use NEXT_PUBLIC_ for database/auth secrets. Next.js reads its environment files; standalone scripts read only the files explicitly specified by their command.
-
-| Variable | Purpose / default |
-| --- | --- |
-| DATABASE_URL | Required PostgreSQL connection. Host example: `postgresql://erp:erp_local_only@localhost:5433/erp?schema=public`; Compose supplies an internal URL to postgres:5432. |
-| NEXTAUTH_SECRET / AUTH_SECRET | Stable random auth secret; AUTH_SECRET takes precedence. Use a unique value per real installation. |
-| NEXTAUTH_URL / AUTH_URL | Public origin, initially http://localhost:3000; AUTH_URL takes precedence. Use the real HTTPS origin externally. |
-| AUTH_TRUST_HOST | Compose sets true for its known host setup; review host/proxy trust elsewhere. |
-| ERP_DEMO_MODE | false for PostgreSQL. true explicitly enables the separate legacy demo mode; never use it to hide DB failure. |
-| POSTGRES_PASSWORD | Compose password; erp_local_only is a local sample default. For real use select a strong URL-safe value and set a matching host DATABASE_URL. |
-| POSTGRES_PORT / APP_PORT | Host ports 5433 / 3000, bound to 127.0.0.1. Changing APP_PORT also requires the matching auth URL. |
-| SEED_MODE | sample for the isolated sample workspace; bootstrap for an administrator without sample business records. |
-| SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD | Sample credentials above; bootstrap requires an explicit email and password of at least 12 characters. |
-| SEED_WORKSPACE_NAME | Initialized company name. |
-| SEED_REFERENCE_DATE | Optional YYYY-MM-DD UTC anchor for reproducible sample dates; empty uses today's UTC date. |
-| SEED_ONLY_IF_EMPTY | Optional bootstrap guard: true prevents creating a new administrator when another user already exists. |
-| NODE_ENV | production in the app container. |
-| NEXT_OUTPUT_STANDALONE | Internal Docker build flag: 1 produces standalone output. |
-| VERCEL_ENV | Platform-provided; vercel-build migrates only production. |
-
-Prisma commands and db:seed use `.env`; the Node seed command does not automatically read `.env.local`. For isolated checks override DATABASE_URL in the process instead of overwriting a working `.env`. Do not print full connection URLs, cookies or tokens.
-
-## Running Locally
-
-With Next.js on the host and PostgreSQL in Compose:
-
-```powershell
-npm ci
-docker compose up -d postgres
-npm run db:migrate
-npm run db:seed
-npm run dev
-```
-
-Use the host connection/port from `.env`; postgres resolves inside Compose, not on the host. Open http://localhost:3000. Seed is explicit initialization, not recovery from a connection error.
-
-For production mode on the host:
-
-```powershell
-npm run build
-npm start
-```
-
-For an empty real installation set SEED_MODE=bootstrap, custom administrator email/password and SEED_ONLY_IF_EMPTY=true before migrations/seed. Bootstrap preserves existing account credentials/memberships. Sample reruns preserve the initialized workspace instead of resetting edits. Do not import the public sample account into a real shared installation.
-
-| Command | Purpose |
-| --- | --- |
-| npm run build | Prisma generation and Next production build/type validation |
-| npx tsc --noEmit / npm run typecheck | Strict TypeScript check |
-| npx prisma validate | Schema check; does not prove migration execution |
-| npm run db:generate | Regenerate Prisma Client |
-| npm run db:migrate | Deploy checked-in migrations |
-| npm run db:seed / npx prisma db seed | Explicit sample/bootstrap dispatch |
-| npm run db:studio | Inspect an authorized database target |
-| npm run check:crm | Existing CRM checkpoint suite |
-| npm run check:finance-inventory | Existing Finance/Inventory checkpoint suite |
-| npm run check:hr-projects-settings | Existing HR/Projects/Settings checkpoint suite |
-
-Checkpoint suites have local DB/base URL guards and create temporary tenants. Read their reports/scripts before running; never point them at production or remove guards to obtain a passing run.
-
-## Docker Setup
-
-```powershell
-docker compose up --build -d
-docker compose run --rm seed
-docker compose ps -a
-docker compose logs --tail 50 app migrate
-```
-
-Startup: PostgreSQL health → successful migration job → app. Seed belongs to the optional tools profile and runs only explicitly. The standalone app image runs as non-root; Prisma CLI/Faker stay in the tools image. Fonts, CSS and PDFKit assets are bundled for PDF generation.
-
-`/login` is liveness. `/api/health` requires authentication and checks PostgreSQL, reporting mode=postgresql in its Result. Healthy Next.js alone is not proof of a working DB.
-
-```powershell
-docker compose stop
-docker compose up -d
-```
-
-Stop retains data. The erp_postgres16 volume is separate from the former PG17 volume; back up/migrate explicitly when changing versions. Do not delete volumes as a troubleshooting shortcut. Seed/no-op guarantees and container evidence: [TASK-027](docs/TASK-027.md).
-
-Vercel production uses npm run vercel-build: environment validation, Prisma generation, reviewed migrations, optional administrator-only bootstrap, Next build. Preview does not migrate/seed the shared database. Provision isolated environment databases separately; see [DEPLOYMENT.md](docs/DEPLOYMENT.md).
-
-## Project Structure
-
-```text
-src/
-  app/                    Routes, Server Components, loading/error, API
-    (auth)/               Login and invitation redemption
-    (dashboard)/          Authenticated workspace
-    api/                  Auth, health, CSV, invoice PDF
-  modules/                crm, finance, inventory, hr, projects, settings, dashboard
-  components/ui/          Shared Shadcn/Radix primitives
-  components/layout/      Sidebar, header, commands, providers
-  components/blocks/      Composed screens and legacy blocks
-  hooks/                  Permissions, Kanban DnD, reusable UI hooks
-  lib/                    DB/auth/permissions/errors/utils, legacy document layer
-  types/                  Shared serializable contracts
-  i18n/                   English/Russian catalogs and helpers
-prisma/                   Schema, SQL migrations, explicit seed
-public/fonts/             PDF fonts and third-party license
-scripts/                  Checkpoint suites, Vercel build
-docs/                     ADRs, task/checkpoint evidence, module guides
-```
-
-New features use normalized models/services. Document/DocumentPayment remain transitional, with separate /documents routes in most modules; /crm still hosts the legacy deal table. Normalized contacts, pipeline, invoices and KPIs do not substitute legacy documents for their data.
-
-## Module Guide (CRM / Finance / Inventory / HR / Projects)
-
-| Module | Entry points | Responsibilities |
+| Раздел | Для чего нужен | С чего начать |
 | --- | --- | --- |
-| CRM | /crm/contacts, /crm/contacts/[id], /crm/pipeline | Contact/Deal/Activity, six stages, server pagination, versioned bulk, MANAGER+ CSV. [CRM](docs/modules/crm.md) |
-| Finance | /finance, /finance/payments, /finance/expenses, /finance/dashboard, /finance/reports | Invoice/items/payment workflow, EUR, PDF, P&L. [Finance](docs/modules/finance.md) |
-| Inventory | /inventory, /inventory/[id], /inventory/warehouses, /inventory/dashboard | Per-warehouse balances and immutable ledger. [Inventory](docs/modules/inventory.md) |
-| HR | /hr, /hr/[id], /hr/org-chart, /hr/leaves | Employees, manager hierarchy, doc links, manual allowance, leave. [HR](docs/modules/hr.md) |
-| Projects | /projects, /projects/overview | Versioned Kanban/List, budget/progress/team, CSS Grid timeline. [Projects](docs/modules/projects.md) |
+| Обзор / Dashboard | Быстро оценить поступления, сделки, складские предупреждения и заявки на отпуск | Посмотрите показатели и перейдите по нужной карточке |
+| CRM | Хранить клиентов, контакты, этапы продаж и историю общения | Создайте контакт, затем работайте с воронкой и активностями |
+| Финансы / Finance | Выставлять счета, учитывать оплаты и расходы, смотреть финансовые отчёты | Откройте счета или реестр платежей |
+| Склад / Inventory | Вести товары, склады, остатки и движения | Создайте товар и зарегистрируйте поступление |
+| Персонал / HR | Вести сотрудников, руководителей, документы-ссылки и отпуска | Откройте каталог и карточку сотрудника |
+| Проекты / Projects | Распределять задачи, отслеживать выполнение, бюджет и команду | Выберите проект и создайте задачу |
+| Настройки / Settings | Изменять параметры компании, участников и доступ; просматривать аудит | Администратор настраивает компанию и приглашает команду |
 
-Money is Decimal(20,0) **eurocents**, quantity Decimal(20,3), taxRate Decimal(5,2). Round each qty × unitPrice to cents; subtotal sums lines; taxAmount rounds subtotal × taxRate / 100; total adds tax. Never convert arbitrary money to JS Number. Invoice DRAFT → SENT; PAID derives from receipts, OVERDUE from due date/workspace calendar. Only unpaid drafts can be edited/deleted. Payments cannot exceed balance; stock movements cannot be edited/deleted by any role.
+## 3. Общие правила работы со списками
 
-Finance/Main Dashboard Revenue uses receipts. P&L uses full invoice totals including tax on their final-payment date, excludes partial payments, then subtracts dated expenses. This is management reporting, not a general ledger. Existing RUB data was converted once at the user-confirmed 1 EUR = 93 RUB; historical audit/stock movements remain unchanged.
+Используйте поиск и фильтры над таблицей, чтобы сузить список. Фильтры влияют на видимые записи; показатели общего обзора могут рассчитываться по всей компании. Кнопки **Предыдущая / Следующая** переключают страницы результатов. Широкую таблицу на телефоне прокручивайте внутри её области.
 
-HR days exclude weekends, not public holidays. Annual allowance is manual per employee/year; absent differs from zero. Approved annual leave reduces balance; pending is separate. Project progress is DONE/all tasks; budget usage sums linked expenses. Shared DnD changes status, not a persisted custom card rank.
+Нажатие названия открывает карточку там, где карточка предусмотрена. Карандаш означает редактирование; действие удаления доступно только при достаточных правах и отсутствии блокирующих связей. При удалении система запрашивает подтверждение.
 
-The root Dashboard composes queries with Promise.all/no-store. Settings owns per-workspace configuration, users/invitations and ADMIN+ audit. See [Dashboard](docs/modules/dashboard.md), [Settings](docs/modules/settings.md), [dependencies/RBAC](docs/architecture.md).
+Если появилась ошибка «Запись уже изменена», обновите список и проверьте актуальные значения: другой участник мог сохранить изменения раньше вас. Если результат сохранения неизвестен из-за сети, сначала обновите данные. Особенно важно проверить реестр перед повторным вводом оплаты.
 
-## Adding a New Module (шаблон с кодом)
+Скрытая или неактивная кнопка часто означает ограничение роли, статуса документа или доступности записи. Отсутствие данных при активном фильтре не означает, что их нет в компании.
 
-Follow [architecture.md](docs/architecture.md). This **illustrative normalized Notes module** shows a read/update; /notes is not an existing feature. Add the model/migration and regenerate Prisma before compiling these examples. Creation/deletion, UI, localization and navigation remain parts of the new module's requirements.
+## 4. Обзор бизнеса
 
-Add `notes WorkspaceNote[]` to the existing Workspace model, then:
+На главной странице показаны:
 
-```prisma
-model WorkspaceNote {
-  id          String    @id @default(cuid())
-  workspaceId String
-  title       String    @db.VarChar(200)
-  version     Int       @default(1)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+- **Поступления / Revenue:** зарегистрированные денежные поступления по счетам за всё время.
+- **Открытые сделки / Open Deals:** сделки воронки, которые ещё не выиграны и не проиграны.
+- **Товары требуют пополнения / Low Stock:** товары с низким и нулевым запасом.
+- **Заявки на отпуск / HR Pending:** ожидающие решения заявки. Показатель доступен согласующим; другим ролям показывается недоступность.
 
-  @@unique([id, workspaceId])
-  @@index([workspaceId, updatedAt, id])
-}
-```
+Ниже находятся график поступлений за шесть месяцев, распределение сделок по этапам, последние счета и лента действий. Нажмите карточку или ссылку рядом с блоком для перехода в подробный раздел. Предупреждение о запасах ведёт к списку пополнения.
 
-Add nonempty-title/version > 0 SQL checks in the reviewed migration. Cross-tenant references need composite foreign keys, as in existing models. Do not replace migrations with db push: Prisma schema does not express all checks/triggers.
+Ошибку загрузки система показывает явно. Такой блок не следует воспринимать как нулевые продажи или нулевой остаток.
 
-`src/modules/notes/types.ts`:
+## 5. CRM: клиенты и продажи
 
-```ts
-export type WorkspaceNote = { id: string; title: string; version: number };
-```
+### Контакты / Contacts
 
-`schema.ts`:
+Откройте **CRM → Контакты**. Здесь находятся люди и компании, с которыми вы работаете.
 
-```ts
-import { z } from "zod";
-export const noteChangeSchema = z.object({
-  id: z.string().cuid(),
-  version: z.number().int().min(1).max(2147483646),
-  title: z.string().trim().min(1).max(200),
-}).strict();
-```
+1. Нажмите **Новый контакт / New contact**.
+2. Укажите имя, компанию, доступные контактные данные, статус и ответственного.
+3. Сохраните. Откройте контакт по имени, чтобы увидеть подробности.
+4. В карточке проверьте контактные сведения, связанные сделки и историю общения. Добавляйте заметки и активности, чтобы коллеги понимали следующий шаг.
 
-`access.ts`:
+Поиск, фильтры и сортировка помогают находить нужных клиентов. Выделение строк позволяет выполнить доступные групповые действия: сменить ответственного или удалить выбранные контакты. Экспорт доступен менеджерам и администраторам. Удаление контакта со связанными записями может быть запрещено — сохраните историю и измените статус вместо удаления.
 
-```ts
-import "server-only";
-import { getSession } from "@/lib/auth";
-import { err } from "@/lib/errors";
-import type { Result, SessionContext } from "@/types/shared";
+### Воронка / Deal pipeline
 
-/** Resolve the live tenant; Notes requires PostgreSQL. */
-export async function getNotesContext(): Promise<Result<SessionContext>> {
-  const session = await getSession();
-  if (!session.ok) return session;
-  return session.data.demo
-    ? err("CONFIGURATION", "Notes requires PostgreSQL") : session;
-}
-```
+Воронка показывает сделки по этапам:
 
-`queries.ts`:
-
-```ts
-import "server-only";
-import { db } from "@/lib/db";
-import { err, ok } from "@/lib/errors";
-import { getNotesContext } from "./access";
-import { noteChangeSchema } from "./schema";
-import type { Result } from "@/types/shared";
-import type { WorkspaceNote } from "./types";
-
-/** Read a note in the live workspace without trusting a client tenant ID. */
-export async function getNote(id: string): Promise<Result<WorkspaceNote>> {
-  const context = await getNotesContext();
-  if (!context.ok) return context;
-  if (!noteChangeSchema.shape.id.safeParse(id).success)
-    return err("VALIDATION", "Check the note ID");
-  try {
-    const row = await db.workspaceNote.findUnique({
-      where: { id_workspaceId: { id, workspaceId: context.data.workspaceId } },
-      select: { id: true, title: true, version: true },
-    });
-    return row ? ok(row) : err("NOT_FOUND", "Note not found");
-  } catch { return err("STORAGE", "Notes could not be loaded"); }
-}
-```
-
-`service.ts`:
-
-```ts
-import "server-only";
-import { Prisma } from "@prisma/client";
-import { db } from "@/lib/db";
-import { err, ok } from "@/lib/errors";
-import { canWrite } from "@/lib/permissions";
-import { getNotesContext } from "./access";
-import { noteChangeSchema } from "./schema";
-import type { Result } from "@/types/shared";
-import type { WorkspaceNote } from "./types";
-
-/** Update a captured version and audit it in one serializable transaction. */
-export async function updateNote(input: unknown): Promise<Result<WorkspaceNote>> {
-  const context = await getNotesContext();
-  if (!context.ok) return context;
-  if (!canWrite(context.data.role)) return err("FORBIDDEN", "Notes are read-only");
-  const parsed = noteChangeSchema.safeParse(input);
-  if (!parsed.success) return err("VALIDATION", "Check the note and version");
-  const { id, title, version } = parsed.data;
-  const { workspaceId, userId, name } = context.data;
-  try {
-    return await db.$transaction(async (tx) => {
-      const member = await tx.membership.findUnique({
-        where: { userId_workspaceId: { userId, workspaceId } },
-        include: { user: { select: { isActive: true } } },
-      });
-      if (!member?.isActive || !member.user.isActive || !canWrite(member.role))
-        return err("FORBIDDEN", "Your workspace access changed");
-      const before = await tx.workspaceNote.findUnique({
-        where: { id_workspaceId: { id, workspaceId } },
-        select: { id: true, title: true, version: true },
-      });
-      if (!before) return err("NOT_FOUND", "Note not found");
-      if (before.version !== version) return err("CONFLICT", "Reload the note");
-      // All Result guards precede writes. A write/audit exception aborts the transaction.
-      const after = await tx.workspaceNote.update({
-        where: { id_workspaceId: { id, workspaceId }, version },
-        data: { title, version: { increment: 1 } },
-        select: { id: true, title: true, version: true },
-      });
-      await tx.auditLog.create({ data: {
-        workspaceId, actorId: userId, actor: name, domain: "notes",
-        action: "updated", entityType: "WorkspaceNote", entityId: id,
-        title: after.title, before: { ...before }, after: { ...after },
-      } });
-      return ok(after);
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-  } catch (error: unknown) {
-    return error instanceof Prisma.PrismaClientKnownRequestError
-      && ["P2025", "P2034"].includes(error.code)
-      ? err("CONFLICT", "Reload the note")
-      : err("STORAGE", "The note could not be saved");
-  }
-}
-```
-
-`actions.ts`:
-
-```ts
-"use server";
-import { revalidatePath } from "next/cache";
-import { localizeResult } from "@/i18n/server";
-import * as queries from "./queries";
-import * as service from "./service";
-
-/** Read through the authorized public action boundary. */
-export async function getNote(id: string) {
-  return localizeResult(await queries.getNote(id));
-}
-
-/** Save through the service; a refresh failure does not undo the commit. */
-export async function updateNote(input: unknown) {
-  const result = await service.updateNote(input);
-  if (result.ok) {
-    try { revalidatePath("/notes"); }
-    catch { console.error("Notes cache refresh failed after commit"); }
-  }
-  return localizeResult(result);
-}
-```
-
-Add components/ and a Server Component page using authorized queries. Lists need bounded server pagination, whitelisted sorting and visible error/empty states. Add loading/error boundaries, shared forms, en/ru messages (including example errors), semantic colors, entrance/reduced motion and mobile behavior. Register Sidebar/header, command palette and useNewRecordAction for creation.
-
-The shared Domain union still drives legacy Record<Domain,...> registries. Do not invent a Document adapter just to satisfy those maps. Review whether to extend/refactor the registry or retain an explicit normalized access boundary as Settings does. Wire the new audit domain/entity into DTOs, readers, safe summaries and links before exposing it. A string audit.domain in PostgreSQL does not make every UI reader understand a new domain.
-
-## RBAC & Permissions
-
-Read tenant/actor/role from the live server session. Scope every query and related ID to its workspace. Composite FK protect references; DB RLS is not implemented. SUPER_ADMIN has no cross-workspace bypass. UI usePermissions is not authorization.
-
-| Role | Create/update | Delete | Export | Manage users | Read workspace |
-| --- | --- | --- | --- | --- | --- |
-| SUPER_ADMIN | Yes | Yes | Yes | Yes | Yes |
-| ADMIN | Yes | Yes | Yes | Yes | Yes |
-| MANAGER | Yes | Yes, except HR | Yes | No | Yes |
-| AGENT | Yes | No | No | No | Yes |
-| READONLY | No | No | No | No | Yes |
-
-Source: [permissions.ts](src/lib/permissions.ts); complete [operation matrix](docs/architecture.md). Workflow constraints apply to every role. Leave approval/annual allowance requires MANAGER+; Employee/doc-link deletion ADMIN+; PDF/CSV MANAGER+; configuration writes, members and full audit ADMIN+. Only SUPER_ADMIN manages SUPER_ADMIN assignments. Self-access changes and removal of the last active administrator are protected.
-
-Settings is one versioned row per workspace with atomic audit. Deactivating Membership revokes its workspace sessions. JWT access checks the DB session registry and active Membership/current role; client claims cannot select a tenant or retain removed rights. Session lifetime is 12 hours. Field-level HR/payroll ACL is absent.
-
-## Architecture Laws (все 10 законов)
-
-The original ten laws remain mandatory. TASK-030 explicitly authorizes its commit/push/release; the default restriction on future file-only commits remains.
-
-1. **TypeScript:** strict, noUncheckedIndexedAccess, exactOptionalPropertyTypes; no any. Business operations return Result<T,E>, not throws for expected failures. AppError has code/message/optional serializable meta. Components return JSX, HTTP handlers serialize Result, framework callbacks keep their required signatures.
-2. **Naming:** handlers are handleXxx; Server Actions use getXxx/createXxx/updateXxx/deleteXxx.
-3. **Colors:** only CSS variables/semantic tokens in components. Palette values live centrally in src/app/globals.css. No direct color utilities/hex classes bypassing tokens.
-4. **Design:** Geist Sans + Geist Mono, no Inter. No blue CTA #3b82f6 or cyan/purple gradients. Every visible component has entrance animation with prefers-reduced-motion support.
-5. **Modules:** src/modules/<domain>/{types,schema,actions,queries,service}.ts and components/. Additional configuration/domain-operation files are allowed.
-6. **DRY:** inspect src/components/ui, src/hooks and src/types/shared.ts before introducing components, hooks or types. Reuse shared table/form/Kanban patterns.
-7. **Checks:** new test files only in an assigned CHECKPOINT. Ordinary tasks run build and visual checks of changed UI; typecheck is allowed for diagnosis. Never replace failed PostgreSQL with demo data.
-8. **Documentation:** public functions have JSDoc; architectural changes immediately update architecture.md and domain docs.
-9. **Git:** feat(module): TASK-NNN description, or fix:/docs:/refactor:/chore:. No commits for file-only tasks without an explicit commit/push/release request. Preserve unrelated edits; do not force-push/rewrite shared history as a shortcut.
-10. **Contradictions:** a real law conflict stops dependent implementation. Record requirements/alternatives/consequences in [contradictions.md](docs/contradictions.md); resume dependent work only after resolution.
-
-Mandatory data/security rules: session-derived tenant/role, captured versions for updates, atomic write/audit, immutable stock ledger, eurocent money, plain DTOs and no SQL/stack/secret leakage. Validate before writes: returning err from a Prisma transaction callback does not roll back preceding writes. Unexpected write failures abort the transaction. Retry only documented guaranteed-rollback conflicts, never arbitrary business/external side effects.
-
-## Server Actions Reference
-
-Client components import src/modules/<domain>/actions.ts; Server Components may call server-only queries for initial data. Do not import DB/auth into client code. Actions localize Result/revalidate after commit; access/query/service enforce security/workflow. Consult module types for exact input/defaults.
-
-| File | Normalized action families |
+| Этап | Смысл |
 | --- | --- |
-| crm/actions.ts | getContacts/getContactDetail/getContactActivities/getContactDeals/getContactAssignees/getContactsForExport; createContact/updateContact/deleteContact; deleteContacts/updateContactsAssignee; getDeals/getDealsByStage/createDeal/updateDealStage/createActivity |
-| finance/actions.ts | getInvoices/getInvoice/createInvoice/updateInvoice/updateInvoiceStatus/deleteInvoice/createInvoicePayment; getPayments/getPayableInvoices; getExpenses/getExpense/createExpense/updateExpense/deleteExpense; getFinanceDashboard/getFinanceExport/getPnlReport |
-| inventory/actions.ts | getProducts/getProduct/createProduct/updateProduct/deleteProduct; getWarehouses/createWarehouse/updateWarehouse/deleteWarehouse; getStockPosition/getProductMovements/getProductStockPositions/getProductInventory/createStockMovement; getInventoryDashboard/getInventoryStockAlert |
-| hr/actions.ts | getEmployees/getEmployee/getEmployeeDepartments/getEmployeeOrgChart/createEmployee/updateEmployee/deleteEmployee; getLeaves/getLeavePendingCount/createLeave/updateLeaveStatus; getEmployeeProfile; createEmployeeDocumentLink/updateEmployeeDocumentLink/deleteEmployeeDocumentLink/updateEmployeeLeaveAllowance |
-| projects/actions.ts | getTaskWorkspace/getTaskProjects/getTaskProject/getTaskAssignees/createTaskProject/createTask/updateTask/updateTaskStatus/deleteTask; getProjectOverview/getProjectTeam/createOverviewProject/updateOverviewProject |
-| settings/actions.ts | getMembers/updateMember/getInvitations/createInvitation/deleteInvitation/createInvitedMembership/getAuditLog; getAppConfiguration/updateAppConfiguration |
+| Новая / New | Обращение получено, работа ещё начинается |
+| Квалификация / Qualified | Уточнены потребность и пригодность клиента |
+| Предложение / Proposal | Подготовлено или отправлено предложение |
+| Переговоры / Negotiation | Обсуждаются условия |
+| Выиграна / Won | Продажа завершилась успешно |
+| Проиграна / Lost | Продажа не состоялась |
 
-Legacy actions remain for transitional screens; they do not replace normalized services. Auth uses createSession/deleteSession in src/lib/auth-actions.ts. Lists use filter DTOs; updates/deletes normally take id/version plus input. Settings includes version in its input. Absent Settings/allowance/stock have documented version-zero creation cases. Payment takes the invoice's captured version.
+Перетащите карточку за область переноса в другую колонку либо используйте доступный выбор этапа. Клавиатурный перенос поддерживает Space, стрелки и Space для завершения. Дождитесь сохранения. При конфликте карточка возвращается к подтверждённому состоянию; обновите данные и повторите осознанно.
 
-Handle Result.ok and VALIDATION/UNAUTHORIZED/FORBIDDEN/NOT_FOUND/CONFLICT/STORAGE/CONFIGURATION explicitly. Reload/review on CONFLICT; do not blindly retry an uncertain payment. Keep export authorization and CSV cell protection on the server.
+### Активности и таблица «Сделки»
 
-| HTTP route | Contract |
+В карточке контакта добавляйте звонки, письма, встречи, заметки и задачи, указывая тему и необходимые подробности. Фильтры истории помогают найти конкретный тип взаимодействия.
+
+Раздел **CRM → Сделки** содержит отдельный табличный реестр с названием, компанией/контактом, бюджетом, этапом, плановой датой и комментарием. Создавайте и редактируйте запись через форму этого реестра.
+
+**Особенность текущей версии:** таблица «Сделки» и воронка используют два самостоятельных реестра. Изменение строки таблицы не переносит карточку воронки. Для отслеживания этапов связанных с контактами продаж используйте воронку. Учебные примеры заполнены в обоих разделах.
+
+## 6. Финансы: счета, оплаты и расходы
+
+### Создать и отправить счёт
+
+1. Откройте **Финансы → Счета / Finance → Invoices** и нажмите создание счёта.
+2. Выберите клиента из CRM. Укажите дату выставления, срок оплаты и другие нужные реквизиты.
+3. Добавьте строки: описание, количество и цену за единицу. Изменяйте строки прямо в форме.
+4. Укажите ставку налога. Система сама рассчитает сумму строк, налог и итог. Например: 2 × €100 при налоге 20% дают €200 до налога, €40 налога и €240 всего.
+5. Сохраните черновик. Номер вида INV-2026-0001 присваивается автоматически.
+6. Проверьте карточку и нажмите **Отправить / Send**, когда счёт готов к передаче клиенту.
+
+Вводите суммы в евро, а не в евроцентах. Валюта компании и новых записей — EUR. Суммы и количества округляются по правилам системы; итоговая сумма отображается в карточке.
+
+### Статусы счёта
+
+| Статус | Что происходит |
 | --- | --- |
-| /api/auth/[...nextauth] | Auth.js transport |
-| /api/health | Authenticated app/DB readiness |
-| /api/finance/invoices/[id]/pdf | MANAGER+ invoice PDF with local fonts/CSS assets |
-| /api/reports/export?type=pnl&from=YYYY-MM-DD&to=YYYY-MM-DD | MANAGER+ fresh P&L CSV; currency is EUR |
+| Черновик / Draft | Можно редактировать и удалить, пока нет оплат |
+| Отправлен / Sent | Счёт выставлен, ожидается оплата; это изменение статуса, автоматическая отправка email не выполняется |
+| Оплачен / Paid | Зарегистрированные поступления полностью покрывают счёт |
+| Просрочен / Overdue | Срок оплаты прошёл, остался долг |
+| Отменён / Cancelled | Неоплаченный счёт отменён доступным действием |
 
-## Customization Guide
+Частичная оплата уменьшает долг. Она не означает полной оплаты; смотрите поля «Оплачено» и «Остаток». Статус Paid не назначается вручную. Оплаченный счёт нельзя отменить или удалить обычным действием.
 
-- **Company/formatting:** Settings controls name/logo/timezone/date format/notification flags. Logo is validated inline PNG ≤256 KB and ≤1024 × 1024; no arbitrary URL fetch. Use ConfigurationProvider/useAppFormat in clients and configuredDate/configuredTimestamp on servers. DATE remains calendar-only; timestamps use workspace timezone. Defaults never hide storage errors.
-- **Language:** add matching en/ru catalog entries in src/i18n and preserve placeholders. Translate labels/errors/PDF/CSV; do not translate persisted enums or user text. Cookie evo_locale stores language; invalid values fall back to en.
-- **Theme:** edit central HSL tokens and semantic mappings; reuse ThemeProvider/UI/reduced-motion. Check both themes, keyboard focus, disabled states and 375 px.
-- **Forms/tables/boards:** reuse RHF/Zod sheets, TanStack pagination and shared DnD. Save through versioned Server Actions with visible network/conflict errors.
-- **Permissions:** change canonical permissions and server guards together, then UI. Unknown roles fail closed; Employee.managerId does not imply an ACL.
-- **Schema/seed/deploy:** add SQL migrations, validate real PostgreSQL, preserve sample isolation/explicit seed and third-party font licenses. Keep secrets and environment databases separate.
+### Зарегистрировать платёж и получить PDF
 
-## Known Limitations
+В карточке счёта выберите **Зарегистрировать платёж / Record payment** либо откройте **Платежи / Payments**. Выберите счёт, укажите сумму, дату, способ и уникальное основание/референс платежа. Сохраните и проверьте остаток. Сумма не должна превышать долг; повторяющееся основание может быть отклонено. Обычного действия изменения/удаления платежа сейчас нет.
 
-- Legacy Document coexistence. Historical reports may mention RUB/USD or fixed Moscow behavior; final architecture defines EUR and workspace Settings.
-- Task dueDate is saved at end-of-day +03:00 regardless of the configured timezone. Finance/Projects have helper imports in both directions.
-- Invitations are one-time links; no email/push transport, MFA, password reset, login rate limiter or full workspace-switch UI. Auth.js v5 is beta.
-- Workspace readers can read ordinary HR data; no field-level payroll ACL. Documents/receipts are links, not secure file uploads/storage.
-- No accounting ledger, refunds/allocations, accrual reports or FX engine. Inventory lacks reservations/lots/FIFO; leave lacks public holidays/accrual/carryover.
-- Kanban persists status, not custom rank. Palette searches navigation/actions and bounded legacy records, not every normalized entity.
-- Audit is append-only by application convention; only StockMovement has a DB immutability trigger. No universal outbox/workflow engine/idempotency API.
-- Initial next/font builds fetch Geist and need network; runtime PDF uses local fonts/CSS/PDFKit assets.
-- Each installation needs backups, monitoring, environment isolation and security review. Local checkpoint success does not verify an external deployment.
+Менеджеры и администраторы могут скачать PDF из карточки счёта. Проверьте язык, данные компании и реквизиты перед передачей файла клиенту. Формирование PDF и изменение статуса не отправляют письмо автоматически.
 
-## Contributing
+### Расходы / Expenses
 
-Read this guide, architecture, roadmap and domain docs first. Work on a focused branch, preserve existing edits and follow all ten laws. Never commit .env, cookies, credentials or local PostgreSQL data.
+1. Откройте **Расходы** и создайте запись.
+2. Укажите название, сумму EUR, категорию и дату.
+3. При необходимости выберите проект, добавьте ссылку на чек и комментарий.
+4. Сохраните. Для просмотра расходов нужного типа используйте фильтр категории, поиск и период, где они доступны.
 
-Ordinary tasks require build and relevant UI checks. At CHECKPOINT also run requested DB/integration verification and trace UI → action/API → PostgreSQL → rendered result. Record exact commands/results/limitations in verification.md and the checkpoint report. New tests belong only to an assigned CHECKPOINT.
+Ссылка на чек ведёт к внешнему файлу; загрузка самого файла в ERP не выполняется. Расход, связанный с проектом, учитывается в использовании его бюджета.
 
-Commit when authorized; PR descriptions explain behavior and evidence. Do not announce a release/merge/tag before its checkpoint passes. A Git tag does not publish an npm package; this application's manifest is private.
+### Финансовая сводка и P&L
 
-## License (MIT)
+**Finance dashboard** показывает поступления, непогашенную задолженность, оплаты за текущий месяц и просроченный долг. Дополнительно доступны графики поступлений, статусы счетов, крупнейшие клиенты и распределение долга по давности.
 
-Project source is available under the [MIT License](LICENSE). Fonts retain their [OFL license](public/fonts/OFL-Geist.txt); dependencies retain their respective licenses. Reference projects in [references.md](docs/references.md) keep their own licenses.
+В **Отчёте о прибылях и убытках / P&L** выберите месяц, квартал, год или свои даты. Отчёт считает полные суммы полностью оплаченных счетов по дате окончательной оплаты, затем вычитает расходы за выбранный период. Поэтому его Revenue может отличаться от поступлений в Dashboard: частичные оплаты в P&L исключены. Net Profit = Revenue − Expenses. Это управленческий отчёт.
+
+Для сохранения отчёта нажмите экспорт CSV, если он доступен вашей роли. Даты и календарные периоды учитывают часовой пояс компании.
+
+## 7. Склад: товары, склады и остатки
+
+### Каталог и предупреждения
+
+В **Склад / Inventory** представлены SKU, название, категория, общий остаток, минимальный запас, статус и цена. Создайте товар, задайте уникальный SKU, единицу измерения, цены и минимальный запас. Остаток появляется через движения товара.
+
+| Статус | Значение |
+| --- | --- |
+| В наличии / In stock | Остаток выше минимального запаса |
+| Низкий запас / Low stock | Остаток больше нуля, но не выше минимума |
+| Нет в наличии / Out of stock | Остаток равен нулю |
+
+Счётчик в меню включает низкий и нулевой запас. **Inventory dashboard** показывает число активных товаров, низкие/нулевые остатки и стоимость, а также таблицу с рекомендацией пополнить запас. Общий остаток товара складывается из остатков на всех складах.
+
+### Склады и движения
+
+В **Склады / Warehouses** создайте склад с уникальным кодом, названием и адресом. Затем откройте товар и добавьте движение:
+
+- **IN / Поступление:** увеличивает остаток выбранного склада.
+- **OUT / Списание:** уменьшает остаток; списать больше наличия нельзя.
+- **ADJUSTMENT / Корректировка:** укажите величину изменения со знаком. Например, +3 добавляет три единицы, −2 уменьшает на две; это не ввод нового итогового остатка.
+- **TRANSFER / Перемещение:** выберите склад-источник, склад-получатель и количество. На источнике количество уменьшится, на получателе увеличится.
+
+Добавляйте основание и комментарий, чтобы движение было понятно коллегам. История товара показывает дату, тип, количество и основание. **Сохранённое движение не редактируется и не удаляется.** Ошибку исправляйте новым компенсирующим движением с пояснением. Неактивный товар или склад не участвует в новых движениях.
+
+## 8. Персонал: сотрудники, структура и отпуска
+
+### Каталог и карточка сотрудника
+
+В **Персонал / HR** переключайтесь между карточками и таблицей. Используйте поиск и фильтр отдела/статуса. При создании сотрудника заполните имя, табельный номер, должность, отдел, дату приёма и контакты; укажите руководителя, если он есть.
+
+Нажмите сотрудника, чтобы открыть профиль. В нём доступны личные и контактные сведения, документы-ссылки, руководитель и остаток отпуска. Документ добавляется названием и ссылкой на файл. Доступность файла определяется также правами внешнего хранилища.
+
+**Сотрудник и пользователь ERP — разные записи.** Карточка сотрудника описывает человека в компании; доступ в ERP назначается через «Настройки → Участники». Создание сотрудника само по себе не создаёт логин.
+
+### Организационная структура
+
+Откройте **Организационная структура / Org chart**. Дерево строится по полю «Руководитель» в карточках сотрудников. Разворачивайте ветви, чтобы увидеть подчинённых. Система не разрешает циклическое подчинение. Указание руководителя не выдаёт ему автоматически роль администратора.
+
+### Запросить и согласовать отпуск
+
+1. Откройте **Заявки на отпуск / Leave requests** и создайте заявку.
+2. Выберите сотрудника и тип отпуска, даты начала/окончания и причину.
+3. Проверьте число рабочих дней: обе границы включены, суббота и воскресенье исключены. Праздничный календарь не учитывается.
+4. Сохранённая заявка имеет статус **Ожидает / Pending**.
+5. Менеджер или администратор открывает очередь и выбирает **Одобрить / Approve** либо **Отклонить / Reject**. Счётчик в меню показывает ожидающие заявки доступным согласующим.
+
+Пересекающиеся ожидающие/одобренные заявки одного сотрудника отклоняются. Завершённое решение не редактируется обычной формой.
+
+Годовой лимит отпуска задаётся вручную в профиле сотрудника менеджером или администратором. «Не задан» означает отсутствие настройки, а не нулевой лимит. Остаток учитывает одобренный ежегодный отпуск выбранного года; будущие одобренные дни также вычитаются, ожидающие показаны отдельно. Автоматического начисления и переноса остатка между годами нет.
+
+## 9. Проекты: задачи, команда и бюджет
+
+Откройте **Проекты / Projects**, выберите или создайте проект. При создании задайте код/название; подробные параметры доступны в **Обзоре проектов / Projects overview**.
+
+### Работа с задачами
+
+1. Выберите проект и нажмите **Новая задача / New task**.
+2. Заполните название и описание, назначьте исполнителя, приоритет и срок.
+3. Сохраните. В Kanban задача появится в соответствующей колонке: **К выполнению / TODO → В работе / In progress → На проверке / In review → Готово / Done**.
+4. Переносите карточку по мере выполнения или меняйте статус в доступной форме. В списке удобно искать, фильтровать и сравнивать сроки.
+
+Переключатель Kanban/List меняет представление тех же задач. Карточки показывают приоритет, исполнителя и срок. Положение внутри колонки после обновления определяется системой; отдельный ручной порядок не сохраняется.
+
+### Обзор проекта
+
+Прогресс — число готовых задач относительно общего числа. Использованный бюджет складывается из расходов Finance, связанных с проектом; выставленный клиенту счёт не считается расходом. Для изменения показателя бюджета зарегистрируйте/исправьте соответствующий расход.
+
+Команда включает руководителя проекта и назначенных на задачи участников. Timeline показывает проекты с заданными датами в выбранном диапазоне; это упрощённое представление сроков. Отсутствующие даты не превращаются автоматически в план.
+
+## 10. Настройки компании, пользователи и аудит
+
+### Компания и уведомления
+
+Администратор может изменить название, PNG-логотип, часовой пояс и формат дат компании. Валюта фиксирована EUR. После сохранения параметры применяются в интерфейсе и поддерживаемых документах.
+
+Уведомления по созданию, изменению, удалению и оплате управляют панелью последних событий. Отключение уведомлений не удаляет аудит и не выключает складские/кадровые счётчики. Email- и push-рассылка сейчас не выполняется.
+
+### Участники / Members
+
+Откройте **Настройки → Участники / Settings → Members**. Раздел доступен администраторам. Таблица содержит аватар/инициалы, имя, email, роль, статус и последний вход. Фильтруйте по роли и активности либо ищите по имени/email.
+
+**Пригласить коллегу:** нажмите **Пригласить участника / Invite member**, укажите email и роль, создайте приглашение. Скопируйте показанную приватную ссылку и передайте адресату самостоятельно: письмо не отправляется. Ссылка одноразовая и действует семь дней; её можно отозвать в списке приглашений. Сама ссылка показывается при создании — сохраните её перед закрытием окна.
+
+Адресат по ссылке задаёт имя и пароль для нового аккаунта. Пользователь с существующим аккаунтом подтверждает действующий пароль. После принятия приглашения он входит в нужное пространство.
+
+**Изменить роль:** нажмите карандаш в строке коллеги, выберите роль и сохраните. **Деактивировать:** нажмите Deactivate и подтвердите; записи и история сохранятся, сессии этого пространства будут отозваны. **Восстановить:** используйте Reactivate. После смены доступа коллеге потребуется снова войти.
+
+Собственный доступ защищён от случайного изменения. Нельзя убрать последнего активного администратора. Роль Super administrator назначает только другой суперадминистратор.
+
+### Что разрешает роль
+
+| Роль | Возможности |
+| --- | --- |
+| Наблюдатель / Read-only | Просмотр рабочих данных, настройка своего языка и темы |
+| Специалист / Agent | Просмотр, создание/редактирование рабочих записей; без удаления и экспорта |
+| Менеджер / Manager | Дополнительно экспорт, удаление разрешённых записей, согласование отпусков и лимиты |
+| Администратор / Administrator | Дополнительно пользователи, настройки компании, полный аудит и удаление кадровых записей |
+| Суперадминистратор / Super administrator | Административные действия и управление ролью суперадминистратора в доступном пространстве |
+
+Роль не отменяет ограничения статусов и истории: например, складское движение нельзя удалить даже администратору.
+
+### Журнал аудита / Audit log
+
+В **Настройки → Журнал аудита** администратор видит последние 100 событий: дату, автора, модуль, действие и запись. Нажмите **Посмотреть изменения / View changes**, чтобы сравнить «До / Before» и «После / After». Обновите список, чтобы увидеть свежие события.
+
+В учебном примере есть подготовленная история создания участников, изменения ролей, отключения/восстановления доступа и работы со сделками. Она помечена как учебный сценарий. В рабочем пространстве аудит фиксирует сохранённые действия команды.
+
+## 11. Частые вопросы
+
+**Почему не вижу участников или аудит?** Эти разделы требуют роли администратора. Обратитесь к администратору своего пространства.
+
+**Почему счёт всё ещё не оплачен?** Сравните итог и зарегистрированные поступления. Частичная сумма оставляет долг; скачивание PDF или статус Sent не регистрируют платёж.
+
+**Почему сумма в P&L отличается от Dashboard?** Dashboard показывает поступления, а P&L — полные суммы полностью оплаченных счетов по дате окончательной оплаты.
+
+**Почему не удаляется запись?** Проверьте права, статус и связанные записи. Например, счёт с оплатами и товар со складской историей защищены от удаления.
+
+**Почему пустая таблица?** Очистите поиск/фильтры, проверьте страницу и выбранное пространство. При сообщении об ошибке загрузки попробуйте обновить, затем обратитесь к администратору.
+
+**Как исправить ошибочное движение или платёж?** Движение исправляется новым компенсирующим движением. Для изменения уже зарегистрированной оплаты обычной формы нет — сообщите администратору, не создавайте дубликат.
+
+**Где скачать документы сотрудника?** Откройте ссылку в его профиле; файл хранится вне ERP. Автоматический файловый архив в этой версии отсутствует.
+
+**Как сообщить о проблеме?** Укажите раздел, время, действие, текст ошибки и номер записи. Не отправляйте пароль или приватную ссылку приглашения в общие каналы.
+
+## 12. Короткий рабочий сценарий
+
+Утром откройте Dashboard, проверьте просроченные счета, складские предупреждения и ожидающие отпуска. В CRM обновите контакты и этапы продаж. В течение дня регистрируйте реальные поступления, расходы и движения товара. В Projects отмечайте ход задач. В конце дня проверьте финансовую сводку; администратор может просмотреть аудит значимых изменений.

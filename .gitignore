@@ -5,6 +5,7 @@ node_modules/
 .data/
 *.tsbuildinfo
 playwright-artifacts/
+public/user-guide.html
 .playwright-mcp/
 
 .vercel

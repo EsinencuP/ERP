@@ -7,6 +7,7 @@ import { calculateInvoice } from "../src/modules/finance/calculations";
 import { getLeaveDays } from "../src/modules/hr/leave-days";
 import { DEFAULT_NOTIFICATIONS } from "../src/modules/settings/config-schema";
 import type { Result } from "../src/types/shared";
+import { createSampleTeam, getSampleTeamState } from "./seed-sample-team";
 
 const workspaceId = "evo-sample-v1", adminId = `${workspaceId}-admin`, markerId = `${workspaceId}-complete`;
 const id = (entity: string, index: number) => `${workspaceId}-${entity}-${index + 1}`;
@@ -39,12 +40,16 @@ export async function createSampleWorkspace(db: PrismaClient): Promise<Result<st
       await tx.$queryRaw`SELECT 1 FROM pg_advisory_xact_lock(27027)`;
       if (await tx.workspace.findUnique({ where: { id: workspaceId } })) {
         const marker = await tx.auditLog.findUnique({ where: { id: markerId } });
-        return marker?.workspaceId === workspaceId && marker.entityType === "SampleSeed"
-          ? { ok: true, data: "Sample workspace already initialized. Data, passwords and edits were preserved." }
-          : { ok: false, error: { code: "CONFLICT", message: "Sample workspace identifier already exists without a completion marker. Nothing was changed." } };
+        if (marker?.workspaceId !== workspaceId || marker.entityType !== "SampleSeed") return { ok: false, error: { code: "CONFLICT", message: "Sample workspace identifier already exists without a completion marker. Nothing was changed." } };
+        const team = await getSampleTeamState(tx); if (!team.ok) return team;
+        if (team.data === "ready") return { ok: true, data: "Sample workspace and training team already initialized. Data, passwords and edits were preserved." };
+        await createSampleTeam(tx, { adminId, passwordHash: hash.data, reference });
+        return { ok: true, data: "Added five training members and CRM scenarios. Existing records, credentials and edits were preserved." };
       }
       if (await tx.user.findUnique({ where: { email: input.data.email } })) return { ok: false, error: { code: "CONFLICT", message: "Seed email belongs to an existing account. Password, role and memberships were preserved. Choose another SEED_ADMIN_EMAIL." } };
       if (process.env.SEED_ONLY_IF_EMPTY === "true" && await tx.user.count() > 0) return { ok: false, error: { code: "CONFIGURATION", message: "Users already exist; SEED_ONLY_IF_EMPTY stopped sample seeding." } };
+      const team = await getSampleTeamState(tx); if (!team.ok) return team;
+      if (team.data === "ready") return { ok: false, error: { code: "CONFLICT", message: "Training marker exists without the base sample workspace. Nothing was changed." } };
       await tx.workspace.create({ data: { id: workspaceId, name: input.data.company, settings: { create: { companyName: input.data.company, timezone: "UTC", notifications: DEFAULT_NOTIFICATIONS } } } });
       await tx.user.create({ data: { id: adminId, name: "Sample Administrator", email: input.data.email, passwordHash: hash.data, role: "ADMIN", memberships: { create: { workspaceId, role: "ADMIN" } } } });
       await createAudit(tx, "settings", "Settings", workspaceId, "Application configuration", { companyName: input.data.company, currency: "EUR", timezone: "UTC", version: 1 });
@@ -110,7 +115,8 @@ export async function createSampleWorkspace(db: PrismaClient): Promise<Result<st
         }
       }
       await tx.auditLog.create({ data: { id: markerId, workspaceId, actor: "Sample initializer", actorId: adminId, domain: "settings", action: "created", entityType: "SampleSeed", entityId: workspaceId, title: "Sample workspace initialized", after: { seedVersion: 1, referenceDate: input.data.reference, contacts: 20, deals: 10, invoices: 5, products: 15, warehouses: 3, employees: 8, projects: 3, tasks: 18 } } });
-      return { ok: true, data: "Sample workspace initialized: 1 admin, 20 contacts, 10 deals, 5 invoices, 15 products, 3 warehouses, 8 employees, 3 projects and 18 tasks. Currency: EUR. Sample credentials are documented in .env.example." };
+      await createSampleTeam(tx, { adminId, passwordHash: hash.data, reference });
+      return { ok: true, data: "Sample workspace initialized: 1 admin and 5 training members, 26 contacts, 16 pipeline deals, 5 CRM register records, 5 invoices, 15 products, 3 warehouses, 8 employees, 3 projects and 18 tasks. Currency: EUR. Sample credentials are documented in .env.example." };
     }, { timeout: 60000, maxWait: 60000 });
   } catch { return { ok: false, error: { code: "STORAGE", message: "Sample seed failed and was rolled back. Check PostgreSQL, migrations and conflicting identifiers." } }; }
 }
