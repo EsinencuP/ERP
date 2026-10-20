@@ -121,3 +121,7 @@
 - CHECKPOINT-05: **техническая приёмка пройдена** — build/tsc/Prisma/seed/Docker, TASK-024 RBAC, PDF/CSV, EN/RU/themes/mobile/commands/animations. [Доказательства](CHECKPOINT-05.md). Git-публикация dev → main и v1.0.0 выполняется после этих проверок; её результат подтверждается GitHub.
 
 **Локализация EN/RU:** английский по умолчанию, русский через Settings, общие каталоги/форматтеры, ошибки, PDF и CSV. Отчёт: [LOCALIZATION.md](LOCALIZATION.md).
+
+## Уточнение после TASK-030 — пользовательское руководство и public sample
+
+**Выполнено.** INSTRUCTIONS.md теперь инструкция по использованию ERP; технические правила сохранены отдельно в DEVELOPER_GUIDE.md. Руководство опубликовано на /user-guide.html. На Vercel добавлены пять участников к sample admin, история доступа, сделки разных стадий, активности и заполненная таблица CRM. Существующие записи сохраняются; повторный seed — no-op. Проверены local upgrade/fresh/rollback и опубликованные Users/Audit/CRM/прочие модули. [Отчёт](USER_GUIDE_PUBLIC_SAMPLE.md).

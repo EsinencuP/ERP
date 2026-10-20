@@ -29,3 +29,9 @@
 Push в main запускает production build с сохранёнными миграциями. Не заменять DATABASE_URL локальным адресом или PRISMA_DATABASE_URL без проверки совместимости. AUTH_SECRET сохранять устойчивым; его смена отзывает JWT. Bootstrap пароль после первого запуска не хранить в env. Для работы пользователя использовать credentials из локального файла, затем организовать собственное управление аккаунтами/паролями.
 
 Этот запуск не добавляет MFA/rate limiting, password reset UI, workspace switching и остальные будущие ERP-сервисы. CHECKPOINT-02 подтверждает CRM-сценарии; текущий деплой подтверждает сборку и основные операции на Vercel.
+
+## Публичный учебный набор — 20.10.2026
+
+По прямому запросу пользователя опубликовано отдельное Evo Sample Company с public sample credentials и пятью дополнительными участниками. Одноразовый production build flag SEED_PUBLIC_SAMPLE=true выполнил transactional sample import, обычные production builds по-прежнему не запускают его автоматически. Private bootstrap account и прежние компании не присоединялись к sample. User manual теперь доступен на /user-guide.html, developer rules — docs/DEVELOPER_GUIDE.md.
+
+Deployment dpl_ByTVBzdTeqo8dyajPiwLYrAaPCKA READY; источник 643ce79. Scope/project проверены через Vercel CLI перед deploy. .vercelignore явно исключает .data/.env/local DB при CLI uploads. Подтверждённые проверки public Users/Audit/CRM/модулей и инструкция: [USER_GUIDE_PUBLIC_SAMPLE.md](USER_GUIDE_PUBLIC_SAMPLE.md).
