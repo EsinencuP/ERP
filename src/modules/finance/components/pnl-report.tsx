@@ -10,7 +10,7 @@ import { EmptyState, ErrorPanel } from "@/components/ui/feedback";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePermissions } from "@/hooks/usePermissions";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDateOnly } from "@/lib/utils";
 import type { Result } from "@/types/shared";
 import { getPnlReport } from "../actions";
 import { FINANCE_CURRENCIES, pnlFiltersSchema } from "../schema";
@@ -61,11 +61,11 @@ export function PnlReport({ initialData, initialFilters }: { initialData: Result
         <Button type="submit" variant="outline" disabled={loading || exporting}><RefreshCw className={loading ? "animate-spin" : ""} />{loading ? t("Загрузка…") : dirty ? t("Применить") : t("Обновить")}</Button>
       </div>
       <p id="pnl-period-help" className="text-xs text-muted-foreground">{t("Календарные периоды · ")}{PNL_TIMEZONE}{t(". Для своих дат выберите Custom, затем примените фильтры.")}</p>
-      {validation && <p className="text-xs text-danger" role="alert">{validation}</p>}
+      {validation && <p className="text-xs text-danger" role="alert">{t(validation)}</p>}
       {dirty && <p className="text-xs text-muted-foreground" role="status">{t("Фильтры изменены. Нажмите «Применить», чтобы обновить отчёт и экспорт.")}</p>}
     </form>
     {loading ? <div role="status" aria-label={t("Загрузка P&L")} className="space-y-5"><div className="grid gap-4 md:grid-cols-3">{[1, 2, 3].map((key) => <Skeleton key={key} className="h-36" />)}</div><Skeleton className="h-80" /></div> : !data.ok ? <ErrorPanel error={data.error} /> : <>
-      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><p>{t("Период отчёта: ")}<span className="font-mono text-foreground">{data.data.from} — {data.data.to}</span></p><span>{data.data.currency} · {PNL_TIMEZONE}</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><p>{t("Период отчёта: ")}<span className="font-mono text-foreground">{formatDateOnly(data.data.from, uiLocale)} — {formatDateOnly(data.data.to, uiLocale)}</span></p><span>{data.data.currency} · {PNL_TIMEZONE}</span></div>
       <div className="grid gap-4 md:grid-cols-3">{[
         { key: "revenue", label: t("Revenue"), amount: data.data.revenue, detail: t`Полностью оплаченных счетов: ${data.data.invoiceCount}`, icon: CircleDollarSign },
         { key: "expenses", label: t("Expenses"), amount: data.data.expenses, detail: t`Расходов за период: ${data.data.expenseCount}`, icon: ReceiptText },

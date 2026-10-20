@@ -28,7 +28,7 @@ export function formatCurrency(amount: number | bigint | string, currency = "RUB
   } catch { return "—"; }
 }
 
-/** Format an ISO date or Date with date-fns tokens and Russian locale in the runtime timezone. */
+/** Format an ISO date or Date with date-fns tokens in the active language. */
 export function formatDate(date: string | Date | number, format?: string, locale: Locale = DEFAULT_LOCALE): string {
   if (date === "") return "—";
   try {
@@ -54,7 +54,7 @@ export function truncate(value: string, maxLength = 80, suffix = "…"): string 
   return characters.slice(0, limit - ending.length).join("") + ending.join("");
 }
 
-/** Format integer minor currency units as Russian rubles. */
+/** Format integer minor currency units as rubles in the active language. */
 export function money(amount: number, compact = false, locale: Locale = DEFAULT_LOCALE): string {
   if (!compact) return formatCurrency(amount, "RUB", locale);
   if (!Number.isSafeInteger(amount)) return "—";
@@ -70,3 +70,24 @@ export function dateLabel(value: string, locale: Locale = DEFAULT_LOCALE): strin
 
 /** Produce a short avatar label from a person's or company's name. */
 export function initials(value: string): string { return value.split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0)).join("").toUpperCase(); }
+
+/** Format a persisted calendar DATE in the active language without shifting its day. */
+export function formatDateOnly(value: string, locale: Locale = DEFAULT_LOCALE): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return "—";
+  const date = new Date(value + "T00:00:00Z");
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value ? "—" : new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(date);
+}
+/** Format an exact decimal string for display, preserving precision and removing insignificant zeroes. */
+export function formatDecimal(value: string, locale: Locale = DEFAULT_LOCALE): string {
+  if (!/^-?\d+(\.\d+)?$/.test(value)) return "—";
+  const negative = value.startsWith("-"), [whole = "0", fraction = ""] = (negative ? value.slice(1) : value).split(".");
+  const decimals = fraction.replace(/0+$/, "");
+  return (negative ? "-" : "") + new Intl.NumberFormat(intlLocale(locale)).format(BigInt(whole)) + (decimals ? (locale === "ru" ? "," : ".") + decimals : "");
+}
+
+/** Localize recognized measurement symbols for display while preserving custom unit names. */
+export function formatUnit(value: string, locale: Locale = DEFAULT_LOCALE): string {
+  const units: Readonly<Record<string, readonly [string, string]>> = { pcs: ["pcs", "шт."], pc: ["pcs", "шт."], "шт.": ["pcs", "шт."], "шт": ["pcs", "шт."], kg: ["kg", "кг"], "кг": ["kg", "кг"], g: ["g", "г"], "г": ["g", "г"], l: ["L", "л"], "л": ["L", "л"], m: ["m", "м"], "м": ["m", "м"], "m²": ["m²", "м²"], "м²": ["m²", "м²"] };
+  const key = value.trim().toLowerCase();
+  return Object.hasOwn(units, key) ? units[key]?.[locale === "ru" ? 1 : 0] ?? value : value;
+}

@@ -1,11 +1,11 @@
 import "server-only";
 import { createTranslator } from "@/i18n/translate";
-import { DEFAULT_LOCALE, intlLocale, type Locale } from "@/i18n/config";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Document, Font, Page, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { err, ok } from "@/lib/errors";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDateOnly, formatDecimal } from "@/lib/utils";
 import type { Result } from "@/types/shared";
 import type { Invoice } from "./types";
 
@@ -37,7 +37,7 @@ async function getPalette(): Promise<Result<Palette>> {
 }
 function InvoicePdf({ invoice, palette, locale }: { invoice: Invoice; palette: Palette; locale: Locale }) {
   const t = createTranslator(locale);
-  const day = (value: string) => new Intl.DateTimeFormat(intlLocale(locale), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`));
+  const day = (value: string) => formatDateOnly(value, locale);
   const money = (value: string) => formatCurrency(value, invoice.currency, locale).replace(/\u00a0|\u202f/g, " ");
   const status = { DRAFT: t("ЧЕРНОВИК"), SENT: t("ОТПРАВЛЕН"), OVERDUE: t("ПРОСРОЧЕН"), PAID: t("ОПЛАЧЕН"), CANCELLED: t("ОТМЕНЁН") }[invoice.status];
   const rowStyle = { flexDirection: "row" as const, borderBottomWidth: 0.5, borderBottomColor: palette.border, paddingVertical: 10, alignItems: "flex-start" as const };
@@ -46,8 +46,8 @@ function InvoicePdf({ invoice, palette, locale }: { invoice: Invoice; palette: P
     <View style={{ marginBottom: 18 }}><Text style={{ fontSize: 8, color: palette.muted, marginBottom: 5 }}>{t("ИСПОЛНИТЕЛЬ")}</Text><Text style={{ fontSize: 12 }}>{invoice.issuerName}</Text></View>
     <View style={{ flexDirection: "row", gap: 24, marginBottom: 24 }}><View style={{ width: "60%" }}><Text style={{ fontSize: 8, color: palette.muted, marginBottom: 5 }}>{t("КЛИЕНТ")}</Text><Text style={{ fontSize: 12 }}>{invoice.customer.company || invoice.customer.name}</Text><Text>{invoice.customer.name}</Text>{invoice.customer.email && <Text style={{ color: palette.muted }}>{invoice.customer.email}</Text>}{invoice.customer.address && <Text style={{ color: palette.muted }}>{invoice.customer.address}</Text>}</View><View style={{ width: "35%" }}><Text style={{ color: palette.muted }}>{t("Дата счёта")}</Text><Text>{day(invoice.issueDate)}</Text><Text style={{ color: palette.muted, marginTop: 9 }}>{t("Оплатить до")}</Text><Text>{day(invoice.dueDate)}</Text><Text style={{ color: palette.muted, marginTop: 9 }}>{t("Валюта: ")}{invoice.currency}</Text></View></View>
     <View style={{ ...rowStyle, color: palette.muted, paddingVertical: 7 }}><Text style={{ width: "45%" }}>{t("Описание")}</Text><Text style={{ width: "13%", textAlign: "right" }}>{t("Кол-во")}</Text><Text style={{ width: "21%", textAlign: "right" }}>{t("Цена")}</Text><Text style={{ width: "21%", textAlign: "right" }}>{t("Сумма")}</Text></View>
-    {invoice.items.flatMap((item) => splitDescription(item.description).map((description, index) => <View key={`${item.id}:${index}`} wrap={false} style={rowStyle}><Text style={{ width: "45%", paddingRight: 12, lineHeight: 1.35 }}>{index ? t("(продолжение) ") : ""}{description}</Text><Text style={{ width: "13%", textAlign: "right" }}>{index ? "" : locale === "ru" ? item.quantity.replace(".", ",") : item.quantity}</Text><Text style={{ width: "21%", textAlign: "right", paddingLeft: 6 }}>{index ? "" : money(item.unitPrice)}</Text><Text style={{ width: "21%", textAlign: "right", paddingLeft: 6 }}>{index ? "" : money(item.total)}</Text></View>))}
-    <View wrap={false} style={{ marginTop: 22, marginLeft: "45%" }}>{[[t("Подытог"), invoice.subtotal], [t`Налог ${locale === "ru" ? invoice.taxRate.replace(".", ",") : invoice.taxRate}%`, invoice.taxAmount], [t("ИТОГО"), invoice.total], [t("Оплачено"), invoice.paid], [t("К оплате"), invoice.balance]].map(([label, value]) => <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}><Text style={{ color: label === t("ИТОГО") ? palette.primary : palette.muted }}>{t(label)}</Text><Text style={{ fontSize: label === t("ИТОГО") ? 12 : 9 }}>{money(value ?? "0")}</Text></View>)}</View>
+    {invoice.items.flatMap((item) => splitDescription(item.description).map((description, index) => <View key={`${item.id}:${index}`} wrap={false} style={rowStyle}><Text style={{ width: "45%", paddingRight: 12, lineHeight: 1.35 }}>{index ? t("(продолжение) ") : ""}{description}</Text><Text style={{ width: "13%", textAlign: "right" }}>{index ? "" : formatDecimal(item.quantity, locale)}</Text><Text style={{ width: "21%", textAlign: "right", paddingLeft: 6 }}>{index ? "" : money(item.unitPrice)}</Text><Text style={{ width: "21%", textAlign: "right", paddingLeft: 6 }}>{index ? "" : money(item.total)}</Text></View>))}
+    <View wrap={false} style={{ marginTop: 22, marginLeft: "45%" }}>{[[t("Подытог"), invoice.subtotal], [t`Налог ${formatDecimal(invoice.taxRate, locale)}%`, invoice.taxAmount], [t("ИТОГО"), invoice.total], [t("Оплачено"), invoice.paid], [t("К оплате"), invoice.balance]].map(([label, value]) => <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}><Text style={{ color: label === t("ИТОГО") ? palette.primary : palette.muted }}>{t(label)}</Text><Text style={{ fontSize: label === t("ИТОГО") ? 12 : 9 }}>{money(value ?? "0")}</Text></View>)}</View>
     {invoice.notes && <View style={{ marginTop: 24, borderTopWidth: 0.5, borderTopColor: palette.border, paddingTop: 12 }}><Text style={{ color: palette.muted, fontSize: 8, marginBottom: 5 }}>{t("КОММЕНТАРИЙ")}</Text><Text>{invoice.notes}</Text></View>}
     <Text fixed style={{ position: "absolute", bottom: 26, left: 42, right: 42, color: palette.muted, fontSize: 8, textAlign: "right" }} render={({ pageNumber, totalPages }) => `${invoice.number} | ${pageNumber} / ${totalPages}`} />
   </Page></Document>;

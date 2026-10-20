@@ -46,7 +46,7 @@ export function ContactReassignDialog({ count, busy, error, onConfirm, onClose, 
       </div>
     </fieldset>
     <p className="mt-3 text-[11px] text-muted-foreground">{t("Показано до 50 активных участников. Используйте поиск, чтобы уточнить список.")}</p>
-    {loadError && <div role="alert" className="mt-3 text-xs text-destructive">{loadError}<Button variant="link" size="sm" onClick={function handleRetry() { setRetry((value) => value + 1); }}>{t("Повторить")}</Button></div>}
+    {loadError && <div role="alert" className="mt-3 text-xs text-destructive">{t(loadError)}<Button variant="link" size="sm" onClick={function handleRetry() { setRetry((value) => value + 1); }}>{t("Повторить")}</Button></div>}
     {error && <p role="alert" className="mt-3 text-xs text-destructive">{t(error)}</p>}
     <div className="mt-6 flex justify-end gap-2"><Button variant="outline" disabled={busy} onClick={onClose}>{t("Отмена")}</Button><Button disabled={busy || disabled || ownerId === undefined} onClick={function handleConfirm() { if (ownerId !== undefined) onConfirm(ownerId); }}>{busy && <Spinner />}{t("Сохранить")}</Button></div>
   </DialogContent></Dialog>;

@@ -59,16 +59,16 @@ export function TaskWorkspace({ initialData, initialNow, initialProject = null }
   function handleSaved() { setForm(null); handleReload(); }
   async function handleMove(task: Task, status: TaskStatus) {
     if (saving.current || locked || !mayWrite || !data.ok || task.status === status || task.status === "CANCELLED") return;
-    const before = data.data; saving.current = true; setBusy(true); setError(""); setAnnouncement(t`Сохраняется статус ${status}`);
+    const before = data.data; saving.current = true; setBusy(true); setError(""); setAnnouncement(t`Сохраняется статус ${t(TASK_STATUS_LABELS[status])}`);
     setData(ok({ ...before, board: moveBoardTask(before.board, task, status), list: { ...before.list, data: before.list.data.map((row) => row.id === task.id ? { ...row, status } : row) } }));
     let committed = false;
     try {
       const result = await updateTaskStatus(task.id, task.version, status); if (!alive.current) return;
-      if (!result.ok) { setData(ok(before)); setBlocked(true); setError(t`${result.error.message}. Показано прежнее состояние. Обновите задачи перед повтором`); return; }
+      if (!result.ok) { setData(ok(before)); setBlocked(true); setError(t`${t(result.error.message)}. Показано прежнее состояние. Обновите задачи перед повтором`); return; }
       committed = true;
       setData((current) => current.ok ? ok({ board: updateBoardTask(current.data.board, result.data), list: { ...current.data.list, data: current.data.list.data.map((row) => row.id === task.id ? result.data : row) } }) : current);
       const fresh = await getTaskWorkspace(filters); if (!alive.current) return;
-      if (fresh.ok) { setData(fresh); setNow(new Date().toISOString()); setAnnouncement(t`Сохранено: ${task.title}, ${status}`); }
+      if (fresh.ok) { setData(fresh); setNow(new Date().toISOString()); setAnnouncement(t`Сохранено: ${task.title}, ${t(TASK_STATUS_LABELS[status])}`); }
       else { setData(fresh); setBlocked(true); setError(t("Статус сохранён, но перечитать задачи не удалось. Обновите данные")); }
     } catch { if (alive.current) { if (!committed) setData(ok(before)); setBlocked(true); setError(committed ? t("Статус сохранён. Обновите задачи для сверки") : t("Результат переноса неизвестен. Показано прежнее состояние; обновите задачи перед повтором")); } }
     finally { saving.current = false; if (alive.current) setBusy(false); }

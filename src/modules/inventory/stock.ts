@@ -1,4 +1,5 @@
-import { DEFAULT_LOCALE, intlLocale, type Locale } from "@/i18n/config";
+import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
+import { formatDecimal } from "@/lib/utils";
 import type { StockStatus } from "./types";
 
 /** Convert an exact nonnegative decimal quantity to thousandths without floating-point arithmetic. */
@@ -12,6 +13,5 @@ export function getStockStatus(stock: string, minStock: string): StockStatus { c
 /** Display exact quantities, including totals larger than the safe integer range. */
 export function formatStockQuantity(value: string, locale: Locale = DEFAULT_LOCALE): string {
   if (!/^-?\d+(\.\d{1,3})?$/.test(value)) return "—";
-  const negative = value.startsWith("-"), [whole = "0", fraction = ""] = (negative ? value.slice(1) : value).split("."); const decimals = fraction.replace(/0+$/, "");
-  return (negative ? "-" : "") + new Intl.NumberFormat(intlLocale(locale)).format(BigInt(whole)) + (decimals ? `${locale === "ru" ? "," : "."}${decimals}` : "");
+  return formatDecimal(value, locale);
 }

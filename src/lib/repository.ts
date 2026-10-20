@@ -28,7 +28,7 @@ export async function getWorkspaceState(session: SessionContext): Promise<Result
     const events: AuditEvent[] = [];
     for (const row of audit) {
       const domain = domainSchema.safeParse(row.domain);
-      if (domain.success && (row.action === "created" || row.action === "updated" || row.action === "deleted" || row.action === "payment")) events.push({ id: row.id, workspaceId: row.workspaceId, actor: row.actor, domain: domain.data, action: row.action, title: row.title, createdAt: row.createdAt.toISOString() });
+      if (domain.success && (row.action === "created" || row.action === "updated" || row.action === "deleted" || row.action === "payment")) events.push({ id: row.id, workspaceId: row.workspaceId, actor: row.actor, domain: domain.data, action: row.action, entityType: row.entityType, title: row.title, createdAt: row.createdAt.toISOString() });
     }
     return success({ documents, events, payments: receipts.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })) });
   } catch { return failure("STORAGE", "Не удалось загрузить данные. Проверьте PostgreSQL и миграции"); }

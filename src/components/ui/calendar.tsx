@@ -36,7 +36,7 @@ function Calendar({
   return (
     <DayPicker
       locale={locale ?? (uiLocale === "ru" ? ru : enUS)}
-      labels={{ labelNav: () => t("Навигация по календарю"), labelPrevious: () => t("Предыдущий месяц"), labelNext: () => t("Следующий месяц"), labelDayButton: (date, modifiers) => `${modifiers.today ? t("Сегодня, ") : ""}${date.toLocaleDateString(uiLocaleTag, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}${modifiers.selected ? t(", выбрано") : ""}`, ...labels }}
+      labels={{ labelMonthDropdown: () => t("Select month"), labelYearDropdown: () => t("Select year"), labelWeekNumber: (week) => t`Week ${week}`, labelWeekNumberHeader: () => t("Week number"), labelNav: () => t("Навигация по календарю"), labelPrevious: () => t("Предыдущий месяц"), labelNext: () => t("Следующий месяц"), labelDayButton: (date, modifiers) => `${modifiers.today ? t("Сегодня, ") : ""}${date.toLocaleDateString(uiLocaleTag, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}${modifiers.selected ? t(", выбрано") : ""}`, ...labels }}
       showOutsideDays={showOutsideDays}
       className={cn("motion-fade",
         "bg-background group/calendar p-3 [--cell-size:2rem] [[data-slot=card-content]_&]:bg-transparent [[data-slot=popover-content]_&]:bg-transparent",

@@ -176,7 +176,7 @@ const FormMessage = React.forwardRef<
   const field = useFormField()
   if (!field.ok) return <p role="alert">{t(field.error.message)}</p>
   const { error, formMessageId } = field.data
-  const body = error ? String(error?.message ?? "") : children
+  const body = error ? t(String(error?.message ?? "")) : children
 
   if (!body) {
     return null
