@@ -1,4 +1,5 @@
 "use client";
+import { useAppFormat } from "@/modules/settings/configuration-provider";
 import { useI18n } from "@/i18n/use-i18n";
 
 import { useId, useRef, useState, type KeyboardEvent } from "react";
@@ -18,9 +19,10 @@ import { EMPLOYEE_STATUS_LABELS } from "./employee-presentation";
 /** Create or edit a captured profile version through the shared non-modal Sheet form. */
 export function EmployeeFormSheet({ employee: initial, onSaved, onClose, onReload, onReturnFocus }: { employee?: Employee; onSaved: () => void; onClose: (needsReload?: boolean) => void; onReload: () => void; onReturnFocus: () => void }) {
   const { t } = useI18n();
+  const { today } = useAppFormat();
 
   const employee = useRef(initial).current, id = useId(), saving = useRef(false), [error, setError] = useState(""), [blocked, setBlocked] = useState(false), [manager, setManager] = useState(employee?.manager ?? null);
-  const form = useForm<EmployeeInput>({ resolver: zodResolver(employeeSchema), mode: "onBlur", reValidateMode: "onBlur", defaultValues: { employeeId: employee?.employeeId ?? "", name: employee?.name ?? "", email: employee?.email ?? "", phone: employee?.phone ?? "", position: employee?.position ?? "", department: employee?.department ?? "", hireDate: employee?.hireDate ?? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), status: employee?.status ?? "ACTIVE", managerId: employee?.managerId ?? "" } });
+  const form = useForm<EmployeeInput>({ resolver: zodResolver(employeeSchema), mode: "onBlur", reValidateMode: "onBlur", defaultValues: { employeeId: employee?.employeeId ?? "", name: employee?.name ?? "", email: employee?.email ?? "", phone: employee?.phone ?? "", position: employee?.position ?? "", department: employee?.department ?? "", hireDate: employee?.hireDate ?? today(), status: employee?.status ?? "ACTIVE", managerId: employee?.managerId ?? "" } });
   const pending = form.formState.isSubmitting;
   async function handleSubmit(input: EmployeeInput) {
     if (saving.current || blocked) return; saving.current = true; setError("");

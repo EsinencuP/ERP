@@ -1,4 +1,5 @@
 "use client";
+import { useAppFormat } from "../configuration-provider";
 import { useEffect, useRef, useState } from "react";
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table";
 import { Pencil, RefreshCw, UserRoundPlus, ShieldCheck } from "lucide-react";
@@ -22,6 +23,7 @@ import { InviteMemberDialog, MemberRoleDialog } from "./member-dialogs";
 
 /** Admin-only directory with server pagination, captured versions and invitation lifecycle controls. */
 export function MembersWorkspace({ session, initialMembers, initialInvitations, now }: { session: SessionContext; initialMembers: Result<PaginatedResponse<WorkspaceMember>>; initialInvitations: Result<Invitation[]>; now: string }) {
+  const { formatDateTime } = useAppFormat();
   const { t, localeTag } = useI18n(), [asOf, setAsOf] = useState(now), [members, setMembers] = useState(initialMembers), [invitations, setInvitations] = useState(initialInvitations), [search, setSearch] = useState(""), query = useDebouncedValue(search, 300), [filters, setFilters] = useState<MemberFilters>({}), [loading, setLoading] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(""), [blocked, setBlocked] = useState(false), [inviteOpen, setInviteOpen] = useState(false), [editing, setEditing] = useState<WorkspaceMember | null>(null), [target, setTarget] = useState<WorkspaceMember | null>(null), [revoking, setRevoking] = useState<Invitation | null>(null), sequence = useRef(0), saving = useRef(false);
   async function handleLoad() { const id = ++sequence.current; setLoading(true); try { const [a, b] = await Promise.all([getMembers({ ...filters, search: query }), getInvitations()]); if (id !== sequence.current) return; setMembers(a); setInvitations(b); setAsOf(new Date().toISOString()); setBlocked(false); setError(""); } catch { if (id === sequence.current) setError(t("Members could not be loaded. Try again")); } finally { if (id === sequence.current) setLoading(false); } }
   const first = useRef(true);
@@ -36,7 +38,7 @@ export function MembersWorkspace({ session, initialMembers, initialInvitations, 
     { accessorKey: "email", header: t("Email"), cell: ({ row }) => <span className="break-all">{row.original.email}</span> },
     { accessorKey: "role", header: t("Role"), cell: ({ row }) => <span>{t(ROLE_LABELS[row.original.role])}</span> },
     { id: "status", header: t("Status"), cell: ({ row }) => <Badge variant="outline" className={row.original.isActive && row.original.accountActive ? "border-success/30 bg-success/10 text-success" : "text-muted-foreground"}>{!row.original.accountActive ? t("Account disabled") : row.original.isActive ? t("Active") : t("Inactive")}</Badge> },
-    { id: "lastLogin", header: t("Last login"), cell: ({ row }) => row.original.lastLoginAt ? <time dateTime={row.original.lastLoginAt}>{new Intl.DateTimeFormat(localeTag, { dateStyle: "medium", timeStyle: "short", timeZone: "Europe/Moscow" }).format(new Date(row.original.lastLoginAt))}</time> : <span className="text-muted-foreground">{t("Not recorded")}</span> },
+    { id: "lastLogin", header: t("Last login"), cell: ({ row }) => row.original.lastLoginAt ? <time dateTime={row.original.lastLoginAt}>{formatDateTime(row.original.lastLoginAt)}</time> : <span className="text-muted-foreground">{t("Not recorded")}</span> },
     { id: "actions", header: t("Actions"), cell: ({ row }) => mayChange(row.original) ? <div className="flex items-center justify-end gap-1"><Button size="icon" variant="ghost" disabled={locked} aria-label={t`Change role: ${row.original.email}`} onClick={function handleEdit() { setEditing(row.original); }}><Pencil /></Button><Button size="sm" variant="outline" disabled={locked} onClick={function handleStatus() { setError(""); setBlocked(false); setTarget(row.original); }}>{row.original.isActive ? t("Deactivate") : t("Reactivate")}</Button></div> : <span className="text-xs text-muted-foreground">{t("Protected")}</span> },
   ];
   const table = useReactTable({ data: members.ok ? members.data.data : [], columns, getRowId: (row) => row.userId, getCoreRowModel: getCoreRowModel(), manualPagination: true });

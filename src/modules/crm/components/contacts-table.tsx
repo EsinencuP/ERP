@@ -1,4 +1,5 @@
 "use client";
+import { useAppFormat } from "@/modules/settings/configuration-provider";
 import { useI18n } from "@/i18n/use-i18n";
 
 
@@ -42,6 +43,7 @@ const noContacts: ContactTableRow[] = [];
 /** Server-paginated contact directory with stable selection, atomic bulk actions and guarded exports. */
 export function ContactsTable({ initialData, initialNow }: { initialData: Result<PaginatedResponse<ContactTableRow>>; initialNow: string }) {
   const { t , locale: uiLocale, localeTag: uiLocaleTag } = useI18n();
+  const { formatDateTime } = useAppFormat();
 
   const [result, setResult] = useState(initialData);
   const [filters, setFilters] = useState<Filters>(initialFilters);
@@ -159,7 +161,7 @@ export function ContactsTable({ initialData, initialNow }: { initialData: Result
     { accessorKey: "email", header: t("Email"), cell: ({ row }) => row.original.email ? <a className="block max-w-52 truncate text-xs text-muted-foreground hover:text-primary hover:underline" href={`mailto:${row.original.email}`} title={row.original.email}>{row.original.email}</a> : <span className="text-muted-foreground">—</span> },
     { accessorKey: "stage", header: t("Этап"), cell: ({ row }) => <ContactStageBadge stage={row.original.stage} /> },
     { id: "assigned", header: t("Ответственный"), enableSorting: false, cell: ({ row }) => <ContactAssigneeAvatar owner={row.original.owner} /> },
-    { accessorKey: "createdAt", header: t("Создан"), cell: ({ row }) => <time className="whitespace-nowrap text-xs text-muted-foreground" dateTime={row.original.createdAt} title={new Intl.DateTimeFormat(uiLocaleTag, { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Moscow" }).format(new Date(row.original.createdAt))}>{formatDistanceStrict(new Date(row.original.createdAt), new Date(now), { addSuffix: true, locale: uiLocale === "ru" ? ru : enUS })}</time> },
+    { accessorKey: "createdAt", header: t("Создан"), cell: ({ row }) => <time className="whitespace-nowrap text-xs text-muted-foreground" dateTime={row.original.createdAt} title={formatDateTime(new Date(row.original.createdAt))}>{formatDistanceStrict(new Date(row.original.createdAt), new Date(now), { addSuffix: true, locale: uiLocale === "ru" ? ru : enUS })}</time> },
     { id: "actions", header: t("Действия"), enableSorting: false, cell: ({ row }) => <DropdownMenu><DropdownMenuTrigger asChild><Button size="icon" variant="ghost" disabled={locked} id={`contact-actions-${row.original.id}`} aria-label={t`Действия: ${row.original.name}`}><MoreHorizontal /></Button></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuItem asChild><Link href={`/crm/contacts/${encodeURIComponent(row.original.id)}`}>{t("Открыть контакт")}</Link></DropdownMenuItem>{mayWrite && <DropdownMenuItem disabled={formContact !== null} onSelect={function handleEdit() { formOpenerId.current = `contact-actions-${row.original.id}`; setFormContact(row.original); }}><Pencil />{t("Редактировать контакт")}</DropdownMenuItem>}{mayWrite && <DropdownMenuItem disabled={formContact !== null} onSelect={function handleReassign() { handleOpenBulk("reassign", [{ id: row.original.id, version: row.original.version, name: row.original.name }]); }}><UserRoundCheck />{t("Назначить ответственного")}</DropdownMenuItem>}{mayDelete && <><DropdownMenuSeparator /><DropdownMenuItem disabled={formContact !== null} className="text-destructive focus:text-destructive" onSelect={function handleDelete() { handleOpenBulk("delete", [{ id: row.original.id, version: row.original.version, name: row.original.name }]); }}><Trash2 />{t("Удалить контакт")}</DropdownMenuItem></>}</DropdownMenuContent></DropdownMenu> },
   ];
   const table = useReactTable({ data: rows, columns, getCoreRowModel: getCoreRowModel(), getRowId: (row) => row.id, manualPagination: true, manualSorting: true, manualFiltering: true, rowCount: result.ok ? result.data.total : 0, enableSortingRemoval: false, enableMultiSort: false, state: { sorting: [{ id: filters.sort.field, desc: filters.sort.direction === "desc" }], rowSelection: selection, pagination: { pageIndex: filters.page - 1, pageSize: filters.pageSize } }, onRowSelectionChange: handleSelectionChange, onSortingChange: handleSortingChange });

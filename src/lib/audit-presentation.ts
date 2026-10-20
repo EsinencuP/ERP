@@ -2,6 +2,7 @@ import type { Translator } from "@/i18n/translate";
 import { STOCK_MOVEMENT_LABELS } from "@/modules/inventory/presentation";
 /** Localize recognized system-generated audit titles; entity metadata protects arbitrary user titles. */
 export function getAuditTitle(event: { title: string; entityType?: string | null }, t: Translator): string {
+  if (event.entityType === "Settings" && event.title === "Application configuration") return t("Application configuration");
   if (event.entityType === "Leave" && event.title.startsWith("Отпуск · ")) return t`Отпуск · ${event.title.slice(9)}`;
   if (event.entityType === "LeaveAllowance" && /^Лимит отпуска · \d{4}$/.test(event.title)) return t(event.title);
   if (event.entityType === "StockMovement") {

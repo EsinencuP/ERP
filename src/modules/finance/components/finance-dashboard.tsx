@@ -1,4 +1,5 @@
 "use client";
+import { useAppFormat } from "@/modules/settings/configuration-provider";
 import { useI18n } from "@/i18n/use-i18n";
 
 import Link from "next/link";
@@ -23,6 +24,7 @@ const agingLabels = ["В срок", "1–30 дней", "31–60 дней", "61�
 /** Show normalized finance KPIs, charts, AR aging and recent invoices with a currency-safe refresh. */
 export function FinanceDashboard({ initialData }: { initialData: Result<FinanceDashboardData> }) {
   const { t, count, locale: uiLocale, localeTag: uiLocaleTag } = useI18n();
+  const { formatDateTime } = useAppFormat();
 
   const { can } = usePermissions(), [exporting, setExporting] = useState(false);
   const [data, setData] = useState(initialData), [currency, setCurrency] = useState<FinanceCurrency>(initialData.ok ? initialData.data.currency : "EUR");
@@ -57,7 +59,7 @@ export function FinanceDashboard({ initialData }: { initialData: Result<FinanceD
       <FinanceCharts data={data.data} />
       <section className="motion-fade panel p-5 sm:p-6" aria-labelledby="aging-title"><div className="flex flex-wrap justify-between gap-2"><div><h3 id="aging-title" className="text-sm font-semibold">{t("Дебиторская задолженность по срокам")}</h3><p className="mt-1 text-xs text-muted-foreground">{t("Остаток по выданным счетам · дни после срока оплаты")}</p></div><span className="font-mono text-xs text-muted-foreground">{currency}</span></div><dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">{data.data.aging.map((row) => <div key={row.bucket} className="motion-fade min-w-0 rounded-lg border p-4"><dt className="text-xs text-muted-foreground">{t(agingLabels[row.bucket])}</dt><dd className="mt-3 break-words font-mono text-sm font-semibold">{formatCurrency(row.amount, currency, uiLocale)}</dd><dd className="mt-2 text-xs text-muted-foreground">{t("Счетов: ")}{row.count}</dd></div>)}</dl></section>
       <RecentInvoices invoices={data.data.recentInvoices} currency={currency} />
-      <p className="text-xs text-muted-foreground">{t("Обновлено: ")}{new Intl.DateTimeFormat(uiLocaleTag, { dateStyle: "short", timeStyle: "short", timeZone: "UTC" }).format(new Date(data.data.asOf))} {t(" UTC. Месяцы и сроки рассчитываются в UTC.")}</p>
+      <p className="text-xs text-muted-foreground">{t("Обновлено: ")}{formatDateTime(new Date(data.data.asOf))} {t(" · Даты и месяцы рассчитаны в часовом поясе компании.")}</p>
     </>}
   </section>;
 }

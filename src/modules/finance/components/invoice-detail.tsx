@@ -1,4 +1,5 @@
 "use client";
+import { useAppFormat } from "@/modules/settings/configuration-provider";
 import { useI18n } from "@/i18n/use-i18n";
 
 import Link from "next/link";
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { usePermissions } from "@/hooks/usePermissions";
 import { canWrite } from "@/lib/permissions";
-import { formatCurrency, formatDateOnly, formatDecimal } from "@/lib/utils";
+import { formatCurrency, formatDecimal } from "@/lib/utils";
 import { err, ok } from "@/lib/errors";
 import type { Result } from "@/types/shared";
 import { createInvoicePayment, deleteInvoice, getInvoice, updateInvoiceStatus } from "../actions";
@@ -22,6 +23,7 @@ import { InvoicePaymentDialog } from "./invoice-payment-dialog";
 /** Show an invoice, exact totals, guarded workflow, payment history and authorized PDF export. */
 export function InvoiceDetail({ initialData }: { initialData: Invoice }) {
   const { t , locale: uiLocale } = useI18n();
+  const { formatDateOnly } = useAppFormat();
 
   const router = useRouter(), { role, can } = usePermissions(), saving = useRef(false);
   const [invoice, setInvoice] = useState(initialData), [dialog, setDialog] = useState<"edit" | "send" | "cancel" | "delete" | "payment" | null>(null), [error, setError] = useState(""), [busy, setBusy] = useState(false), [blocked, setBlocked] = useState(false), [pdfBusy, setPdfBusy] = useState(false);

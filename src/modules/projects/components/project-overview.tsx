@@ -1,4 +1,5 @@
 "use client";
+import { useConfiguration } from "@/modules/settings/configuration-provider";
 import { useI18n } from "@/i18n/use-i18n";
 
 import { useEffect, useRef, useState } from "react";
@@ -25,10 +26,11 @@ import { ProjectTimeline } from "./project-timeline";
 
 /** Coordinate server-paginated overview cards and the matching project timeline, with explicit error/empty states. */
 export function ProjectOverview({ initialData, initialFilters = {} }: { initialData: Result<ProjectOverviewData>; initialFilters?: OverviewFilters }) {
+  const { settings } = useConfiguration();
   const { t } = useI18n();
 
   const router = useRouter(), { role } = usePermissions(), [data, setData] = useState(initialData), [filters, setFilters] = useState(() => { const result = overviewFiltersSchema.safeParse(initialFilters); return result.success ? result.data : overviewFiltersSchema.parse({}); });
-  const [timelinePeriod, setTimelinePeriod] = useState(() => getDefaultProjectTimeline(initialData.ok ? initialData.data.asOf : new Date().toISOString()));
+  const [timelinePeriod, setTimelinePeriod] = useState(() => getDefaultProjectTimeline(initialData.ok ? initialData.data.asOf : new Date().toISOString(), settings.timezone));
   const [search, setSearch] = useState(""), query = useDebouncedValue(search), [revision, setRevision] = useState(0), [loading, setLoading] = useState(false), [form, setForm] = useState<OverviewProject | "create" | null>(null), [team, setTeam] = useState<OverviewProject | null>(null);
   const first = useRef(true), reading = useRef(false), focus = useRef<HTMLElement | null>(null), pendingFocus = useRef(false), refreshButton = useRef<HTMLButtonElement | null>(null), occupied = loading || form !== null || team !== null;
   useEffect(() => { setFilters((current) => current.search === query ? current : { ...current, search: query, page: 1 }); }, [query]);

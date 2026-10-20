@@ -1,4 +1,5 @@
 "use client";
+import { useAppFormat } from "@/modules/settings/configuration-provider";
 import { useI18n } from "@/i18n/use-i18n";
 
 import Link from "next/link";
@@ -14,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { usePermissions } from "@/hooks/usePermissions";
 import { canWrite } from "@/lib/permissions";
-import { formatCurrency, formatDateOnly } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import type { PaginatedResponse, Result } from "@/types/shared";
 import { deleteExpense, getExpenses } from "../actions";
 import { EXPENSE_CATEGORIES, FINANCE_CURRENCIES, expenseCategorySchema, financeCurrencySchema } from "../schema";
@@ -26,6 +27,7 @@ import { EXPENSE_CATEGORY_LABELS, ExpenseReceiptLink } from "./expense-presentat
 /** Browse workspace expenses with category filtering, versioned CRUD, and explicit failure/empty states. */
 export function ExpenseTable({ initialData, initialProjectId = "" }: { initialData: Result<PaginatedResponse<Expense>>; initialProjectId?: string }) {
   const { t , locale: uiLocale } = useI18n();
+  const { formatDateOnly } = useAppFormat();
 
   const { role, can } = usePermissions(), first = useRef(true), saving = useRef(false), returnFocus = useRef<HTMLElement | null>(null), createButton = useRef<HTMLButtonElement | null>(null);
   const [projectId, setProjectId] = useState(initialProjectId);

@@ -14,6 +14,15 @@ Preferences: `/settings`; ADMIN+: `/settings/users`, `/settings/audit`. Данн
 
 Все действия возвращают Result; version/serialization conflict требует refresh без автоматического повтора. Неопределённый ответ мутации блокирует повтор до обновления. EN/RU copy; пользовательские имена/email/title не переводятся. lastLoginAt — успешный вход в это пространство; неизвестная история не выдумывается.
 
-Нет email transport, MFA, rate limiting, password recovery, отдельного session manager и полного workspace switch. TASK-025 (DB App Configuration/Context/notification toggles) остаётся в очереди.
+Нет email transport, MFA, rate limiting, password recovery, отдельного session manager и полного workspace switch. TASK-025 добавляет DB App Configuration/Context/notification toggles.
 
 Currency: единственная базовая EUR; пользователь подтвердил 1 EUR = 93 RUB. Подробности миграции/округления — architecture.md.
+
+
+## TASK-025 — Application configuration
+
+- `getAppConfiguration()`: authenticated tenant read; companyName, PNG logo, fixed EUR, IANA timezone, dateFormat, notification flags, version. Missing row — version 0 until first save, not a write on read. Errors never become defaults.
+- `updateAppConfiguration({...fields,version})`: ADMIN+, strict DTO (no tenant/extra keys), PNG signature/dimension bounds, timezone Intl/PostgreSQL validation. Serializable create/update + Workspace.name + audit; stale version rejected.
+- `ConfigurationProvider` hydrates the dashboard app; `useConfiguration` and `useAppFormat` consume live preferences. Public components have presentation defaults without accessing private tenant settings.
+- `/settings` exposes a read-only view to other roles and explicit demo. Currency stays EUR. Notification toggles filter created/updated/deleted/payment events in the actual Header panel; audit unaffected.
+- PDF branding/date format, shared client date renderers, finance report boundaries/MTD and CSV timezone use these settings. Calendar DATE values do not shift. Historical invoice issuer snapshot remains unchanged.

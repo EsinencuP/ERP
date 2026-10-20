@@ -12,7 +12,7 @@ const file = path.join(root, "demo-workspace.json");
 const stateSchema = z.object({
   baseCurrency: z.literal("EUR").optional(),
   documents: z.array(z.object({ id: z.string(), workspaceId: z.literal("demo-workspace"), domain: domainSchema, version: z.number().int().positive(), createdAt: z.string(), updatedAt: z.string(), data: baseRecordSchema })),
-  events: z.array(z.object({ id: z.string(), workspaceId: z.literal("demo-workspace"), actor: z.string(), domain: domainSchema, action: z.enum(["created", "updated", "deleted", "payment"]), title: z.string(), createdAt: z.string() })),
+  events: z.array(z.object({ id: z.string(), workspaceId: z.literal("demo-workspace"), actor: z.string(), domain: domainSchema.or(z.literal("settings")), action: z.enum(["created", "updated", "deleted", "payment"]), title: z.string(), createdAt: z.string() })),
   payments: z.array(z.object({ id: z.string(), workspaceId: z.literal("demo-workspace"), documentId: z.string(), amount: z.number().int().positive(), reference: z.string(), createdAt: z.string() })),
 });
 const demoGlobal = globalThis as unknown as { erpDemoQueue?: Promise<unknown> };

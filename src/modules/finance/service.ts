@@ -34,7 +34,7 @@ export async function createInvoice(input: InvoiceInput): Promise<Result<Invoice
     const { input: data, amounts, customer } = validated.data, year = Number(data.issueDate.slice(0, 4));
     const sequence = await tx.invoiceSequence.upsert({ where: { workspaceId_year: { workspaceId: session.workspaceId, year } }, create: { workspaceId: session.workspaceId, year, value: 1 }, update: { value: { increment: 1 } } });
     const row = await tx.invoice.create({ data: { workspaceId: session.workspaceId, contactId: data.contactId, createdById: session.userId, number: generateId("INV", { year, value: sequence.value }), currency: data.currency, subtotal: amounts.subtotal, taxRate: data.taxRate, total: amounts.total, issueDate: new Date(data.issueDate), dueDate: new Date(data.dueDate), notes: data.notes || null, customerSnapshot: customer, issuerName: session.workspaceName, items: { create: itemData(data, amounts.lineTotals) } }, include: invoiceInclude });
-    const invoice = toInvoice(row); await audit(tx, session, "created", invoice, null); return ok(invoice);
+    const invoice = toInvoice(row, session.today); await audit(tx, session, "created", invoice, null); return ok(invoice);
   });
 }
 /** Replace draft lines as a versioned aggregate; issued invoices remain immutable. */
@@ -47,7 +47,7 @@ export async function updateInvoice(id: string, version: number, input: InvoiceI
     if (data.issueDate.slice(0, 4) !== existing.data.issueDate.toISOString().slice(0, 4)) return err("VALIDATION", "Год уже присвоенного номера менять нельзя");
     await tx.invoiceItem.deleteMany({ where: { invoiceId: id, workspaceId: session.workspaceId } });
     const row = await tx.invoice.update({ where: { id_workspaceId: { id, workspaceId: session.workspaceId }, version }, data: { contactId: data.contactId, currency: data.currency, issueDate: new Date(data.issueDate), dueDate: new Date(data.dueDate), notes: data.notes || null, subtotal: amounts.subtotal, taxRate: data.taxRate, total: amounts.total, customerSnapshot: customer, issuerName: session.workspaceName, version: { increment: 1 }, items: { create: itemData(data, amounts.lineTotals) } }, include: invoiceInclude });
-    const invoice = toInvoice(row); await audit(tx, session, "updated", invoice, toInvoice(existing.data)); return ok(invoice);
+    const invoice = toInvoice(row, session.today); await audit(tx, session, "updated", invoice, toInvoice(existing.data, session.today)); return ok(invoice);
   });
 }
 /** Send or cancel an eligible invoice; PAID is derived from registered payments. */
@@ -58,7 +58,7 @@ export async function updateInvoiceStatus(id: string, version: number, status: "
     const before = existing.data;
     if (status === "SENT" ? before.status !== "DRAFT" : !["DRAFT", "SENT", "OVERDUE", "PARTIALLY_PAID"].includes(before.status) || before.payments.length > 0) return err("CONFLICT", "Этот переход недоступен: проверьте статус и платежи");
     const row = await tx.invoice.update({ where: { id_workspaceId: { id, workspaceId: session.workspaceId }, version }, data: { status, version: { increment: 1 } }, include: invoiceInclude });
-    const invoice = toInvoice(row); await audit(tx, session, "updated", invoice, toInvoice(before)); return ok(invoice);
+    const invoice = toInvoice(row, session.today); await audit(tx, session, "updated", invoice, toInvoice(before, session.today)); return ok(invoice);
   });
 }
 /** Delete only an unpaid draft without reusing its allocated number. */
@@ -66,7 +66,7 @@ export async function deleteInvoice(id: string, version: number): Promise<Result
   return withMutation("delete", async (tx, session) => {
     const existing = await getVersioned(tx, session, id, version); if (!existing.ok) return existing;
     if (existing.data.status !== "DRAFT" || existing.data.payments.length) return err("CONFLICT", "Удалить можно только черновик без платежей");
-    const invoice = toInvoice(existing.data); await tx.invoice.delete({ where: { id_workspaceId: { id, workspaceId: session.workspaceId }, version } });
+    const invoice = toInvoice(existing.data, session.today); await tx.invoice.delete({ where: { id_workspaceId: { id, workspaceId: session.workspaceId }, version } });
     await audit(tx, session, "deleted", invoice, invoice); return ok(invoice);
   });
 }
@@ -76,10 +76,10 @@ export async function createInvoicePayment(id: string, version: number, input: I
     const parsed = invoicePaymentSchema.safeParse(input); if (!parsed.success) return err("VALIDATION", "Проверьте сумму и реквизиты платежа");
     const existing = await getVersioned(tx, session, id, version); if (!existing.ok) return existing;
     if (!["SENT", "OVERDUE", "PARTIALLY_PAID"].includes(existing.data.status)) return err("CONFLICT", "Оплата доступна только для отправленного неоплаченного счёта");
-    const before = toInvoice(existing.data), amount = BigInt(parsed.data.amount);
+    const before = toInvoice(existing.data, session.today), amount = BigInt(parsed.data.amount);
     if (amount > BigInt(before.balance)) return err("VALIDATION", "Платёж превышает остаток по счёту");
     await tx.payment.create({ data: { workspaceId: session.workspaceId, invoiceId: id, receivedById: session.userId, amount: parsed.data.amount, method: parsed.data.method, reference: parsed.data.reference, notes: parsed.data.notes || null } });
     const row = await tx.invoice.update({ where: { id_workspaceId: { id, workspaceId: session.workspaceId }, version }, data: { status: amount === BigInt(before.balance) ? "PAID" : "SENT", version: { increment: 1 } }, include: invoiceInclude });
-    const invoice = toInvoice(row); await audit(tx, session, "payment", invoice, before); return ok(invoice);
+    const invoice = toInvoice(row, session.today); await audit(tx, session, "payment", invoice, before); return ok(invoice);
   });
 }

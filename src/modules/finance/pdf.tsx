@@ -1,9 +1,12 @@
 import "server-only";
+import { getAppConfiguration } from "@/modules/settings/config-queries";
+import type { AppConfiguration } from "@/modules/settings/config-schema";
+import { configuredDate } from "@/modules/settings/formatting";
 import { createTranslator } from "@/i18n/translate";
 import { DEFAULT_LOCALE, type Locale } from "@/i18n/config";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import { Document, Font, Page, Text, View, renderToBuffer } from "@react-pdf/renderer";
+import { Document, Font, Image, Page, Text, View, renderToBuffer } from "@react-pdf/renderer";
 import { err, ok } from "@/lib/errors";
 import { formatCurrency, formatDateOnly, formatDecimal } from "@/lib/utils";
 import type { Result } from "@/types/shared";
@@ -35,15 +38,15 @@ async function getPalette(): Promise<Result<Palette>> {
     return foreground && muted && primary && border && surface ? ok({ foreground, muted, primary, border, surface }) : err("CONFIGURATION", "Не найдены CSS токены для PDF");
   } catch { return err("CONFIGURATION", "Не удалось загрузить палитру PDF"); }
 }
-function InvoicePdf({ invoice, palette, locale }: { invoice: Invoice; palette: Palette; locale: Locale }) {
+function InvoicePdf({ invoice, palette, locale, configuration }: { invoice: Invoice; palette: Palette; locale: Locale; configuration: AppConfiguration }) {
   const t = createTranslator(locale);
-  const day = (value: string) => formatDateOnly(value, locale);
+  const day = (value: string) => configuredDate(value, locale, configuration);
   const money = (value: string) => formatCurrency(value, invoice.currency, locale).replace(/\u00a0|\u202f/g, " ");
   const status = { DRAFT: t("ЧЕРНОВИК"), SENT: t("ОТПРАВЛЕН"), OVERDUE: t("ПРОСРОЧЕН"), PAID: t("ОПЛАЧЕН"), CANCELLED: t("ОТМЕНЁН") }[invoice.status];
   const rowStyle = { flexDirection: "row" as const, borderBottomWidth: 0.5, borderBottomColor: palette.border, paddingVertical: 10, alignItems: "flex-start" as const };
   return <Document title={t`Счёт ${invoice.number}`} author={invoice.issuerName} language={locale}><Page size="A4" style={{ fontFamily: "Geist", fontSize: 9, color: palette.foreground, backgroundColor: palette.surface, paddingHorizontal: 42, paddingTop: 100, paddingBottom: 65 }}>
     <View fixed style={{ position: "absolute", top: 28, left: 42, right: 42, flexDirection: "row", justifyContent: "space-between", borderBottomWidth: 1, borderBottomColor: palette.primary, paddingBottom: 14 }}><View style={{ width: "47%" }}><Text style={{ fontSize: 16, lineHeight: 1.4, color: palette.primary }}>{t("Счёт на оплату")}</Text><Text style={{ marginTop: 6, fontSize: 8, color: palette.muted }}></Text></View><View style={{ width: "50%", alignItems: "flex-end" }}><Text style={{ fontSize: 15, lineHeight: 1.4 }}>{invoice.number}</Text><Text style={{ marginTop: 4, fontSize: 8, color: palette.muted }}>{t(status)}</Text></View></View>
-    <View style={{ marginBottom: 18 }}><Text style={{ fontSize: 8, color: palette.muted, marginBottom: 5 }}>{t("ИСПОЛНИТЕЛЬ")}</Text><Text style={{ fontSize: 12 }}>{invoice.issuerName}</Text></View>
+    <View style={{ marginBottom: 18 }}>{configuration.logo && <Image src={configuration.logo} style={{ width: 48, height: 48, objectFit: "contain", marginBottom: 8 }} />}<Text style={{ fontSize: 8, color: palette.muted, marginBottom: 5 }}>{t("ИСПОЛНИТЕЛЬ")}</Text><Text style={{ fontSize: 12 }}>{invoice.issuerName}</Text></View>
     <View style={{ flexDirection: "row", gap: 24, marginBottom: 24 }}><View style={{ width: "60%" }}><Text style={{ fontSize: 8, color: palette.muted, marginBottom: 5 }}>{t("КЛИЕНТ")}</Text><Text style={{ fontSize: 12 }}>{invoice.customer.company || invoice.customer.name}</Text><Text>{invoice.customer.name}</Text>{invoice.customer.email && <Text style={{ color: palette.muted }}>{invoice.customer.email}</Text>}{invoice.customer.address && <Text style={{ color: palette.muted }}>{invoice.customer.address}</Text>}</View><View style={{ width: "35%" }}><Text style={{ color: palette.muted }}>{t("Дата счёта")}</Text><Text>{day(invoice.issueDate)}</Text><Text style={{ color: palette.muted, marginTop: 9 }}>{t("Оплатить до")}</Text><Text>{day(invoice.dueDate)}</Text><Text style={{ color: palette.muted, marginTop: 9 }}>{t("Валюта: ")}{invoice.currency}</Text></View></View>
     <View style={{ ...rowStyle, color: palette.muted, paddingVertical: 7 }}><Text style={{ width: "45%" }}>{t("Описание")}</Text><Text style={{ width: "13%", textAlign: "right" }}>{t("Кол-во")}</Text><Text style={{ width: "21%", textAlign: "right" }}>{t("Цена")}</Text><Text style={{ width: "21%", textAlign: "right" }}>{t("Сумма")}</Text></View>
     {invoice.items.flatMap((item) => splitDescription(item.description).map((description, index) => <View key={`${item.id}:${index}`} wrap={false} style={rowStyle}><Text style={{ width: "45%", paddingRight: 12, lineHeight: 1.35 }}>{index ? t("(продолжение) ") : ""}{description}</Text><Text style={{ width: "13%", textAlign: "right" }}>{index ? "" : formatDecimal(item.quantity, locale)}</Text><Text style={{ width: "21%", textAlign: "right", paddingLeft: 6 }}>{index ? "" : money(item.unitPrice)}</Text><Text style={{ width: "21%", textAlign: "right", paddingLeft: 6 }}>{index ? "" : money(item.total)}</Text></View>))}
@@ -54,7 +57,8 @@ function InvoicePdf({ invoice, palette, locale }: { invoice: Invoice; palette: P
 }
 /** Generate a self-contained Cyrillic invoice PDF from one authorized persisted snapshot. */
 export async function createInvoicePdf(invoice: Invoice, locale: Locale = DEFAULT_LOCALE): Promise<Result<Uint8Array>> {
+  const configuration = await getAppConfiguration(); if (!configuration.ok) return configuration;
   const palette = await getPalette(); if (!palette.ok) return palette;
-  try { return ok(new Uint8Array(await renderToBuffer(<InvoicePdf invoice={invoice} palette={palette.data} locale={locale} />))); }
+  try { return ok(new Uint8Array(await renderToBuffer(<InvoicePdf invoice={invoice} palette={palette.data} locale={locale} configuration={configuration.data} />))); }
   catch { return err("STORAGE", "Не удалось сформировать PDF счёта"); }
 }

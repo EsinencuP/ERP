@@ -9,17 +9,18 @@ import { invoiceCustomerSchema, paymentFiltersSchema } from "./schema";
 import { getInvoices } from "./queries";
 import type { Invoice, PaymentFilters, PaymentRow } from "./types";
 
-/** Read an authorized payment page and count, keeping exact money and UTC date boundaries. */
+/** Read an authorized payment page and count, keeping exact money and workspace calendar boundaries. */
 export async function getPayments(filters: PaymentFilters = {}): Promise<Result<PaginatedResponse<PaymentRow>>> {
   const context = await getFinanceContext(); if (!context.ok) return context;
   const parsed = paymentFiltersSchema.safeParse(filters); if (!parsed.success) return err("VALIDATION", "Проверьте фильтры и диапазон дат платежей");
   const data = parsed.data;
-  const end = data.to ? new Date(new Date(`${data.to}T00:00:00.000Z`).getTime() + 86400000) : undefined;
+  let start: Date | null = null, end: Date | null = null;
+  try { if(data.from || data.to) { const rows = await db.$queryRaw<{ start: Date | null; end: Date | null }[]>`SELECT (${data.from ?? null}::date::timestamp AT TIME ZONE ${context.data.timezone}) AS start, ((${data.to ?? null}::date + 1)::timestamp AT TIME ZONE ${context.data.timezone}) AS end`; start=rows[0]?.start ?? null; end=rows[0]?.end ?? null; } } catch(error: unknown) { return getFinanceError(error); }
   const where: Prisma.PaymentWhereInput = {
     workspaceId: context.data.workspaceId,
     invoice: { workspaceId: context.data.workspaceId, ...(data.currency ? { currency: data.currency } : {}) },
     ...(data.method ? { method: data.method } : {}),
-    ...(data.from || end ? { receivedAt: { ...(data.from ? { gte: new Date(`${data.from}T00:00:00.000Z`) } : {}), ...(end ? { lt: end } : {}) } } : {}),
+    ...(start || end ? { receivedAt: { ...(start ? { gte: start } : {}), ...(end ? { lt: end } : {}) } } : {}),
     ...(data.search ? { OR: [{ reference: { contains: data.search, mode: "insensitive" } }, { invoice: { number: { contains: data.search, mode: "insensitive" } } }, { invoice: { contact: { OR: [{ name: { contains: data.search, mode: "insensitive" } }, { company: { contains: data.search, mode: "insensitive" } }] } } }] } : {}),
   };
   try {

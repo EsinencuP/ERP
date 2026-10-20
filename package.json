@@ -13,7 +13,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "node --env-file=.env --import tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "check:hr-projects-settings": "node --env-file=.env --import tsx --test scripts/checkpoint-hr-projects-settings.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

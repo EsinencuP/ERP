@@ -1,4 +1,5 @@
 "use client";
+import { useAppFormat } from "@/modules/settings/configuration-provider";
 import { useI18n } from "@/i18n/use-i18n";
 
 
@@ -8,7 +9,7 @@ import { ArrowDownUp, ChevronLeft, ChevronRight, CreditCard, Pencil, Trash2 } fr
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/feedback";
-import { dateLabel, initials, money } from "@/lib/utils";
+import { initials, money } from "@/lib/utils";
 import { modules } from "@/lib/modules";
 import { usePermissions } from "@/hooks/usePermissions";
 import { canWrite as canWriteRole, canDeleteDocument } from "@/lib/permissions";
@@ -17,6 +18,7 @@ import type { DocumentRecord, Domain, SessionContext } from "@/types/shared";
 /** Accessible, sortable, paginated TanStack table shared by all ERP modules. */
 export function DataTable({ rows, domain, session, selection, onSelectionChange, onEdit, onDelete, onPayment }: { rows: DocumentRecord[]; domain: Domain; session: SessionContext; selection: RowSelectionState; onSelectionChange: (selection: RowSelectionState) => void; onEdit: (row: DocumentRecord) => void; onDelete: (row: DocumentRecord) => void; onPayment: (row: DocumentRecord) => void }) {
   const { t , locale: uiLocale } = useI18n();
+  const { dateLabel } = useAppFormat();
 
   const [sorting, setSorting] = useState<SortingState>([{ id: "title", desc: false }]);
   const definition = modules[domain];

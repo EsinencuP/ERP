@@ -1,4 +1,5 @@
 "use client";
+import { useAppFormat } from "@/modules/settings/configuration-provider";
 import { useI18n } from "@/i18n/use-i18n";
 
 import Link from "next/link";
@@ -13,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { usePermissions } from "@/hooks/usePermissions";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 import { canWrite } from "@/lib/permissions";
-import { formatCurrency, formatDateOnly } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import type { Result, PaginatedResponse } from "@/types/shared";
 import { getInvoices } from "../actions";
 import { INVOICE_STATUSES } from "../schema";
@@ -24,6 +25,7 @@ import { INVOICE_STATUS_LABELS, InvoiceStatusBadge } from "./invoice-presentatio
 /** Browse normalized tenant invoices with bounded search/status pagination and create a draft. */
 export function InvoiceTable({ initialData }: { initialData: Result<PaginatedResponse<Invoice>> }) {
   const { t , locale: uiLocale } = useI18n();
+  const { formatDateOnly } = useAppFormat();
 
   const router = useRouter(), { role } = usePermissions(), first = useRef(true);
   const [data, setData] = useState(initialData), [search, setSearch] = useState(""), value = useDebouncedValue(search, 300);

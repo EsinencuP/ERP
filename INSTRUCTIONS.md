@@ -33,3 +33,8 @@
 ## Auth + RBAC — TASK-004
 
 NextAuth v5 Credentials/JWT; src/lib/permissions.ts — единая матрица, auth.ts реэкспортирует PERMISSIONS/hasPermission. Роли SUPER_ADMIN, ADMIN, MANAGER, AGENT, READONLY; VIEWER переименован миграцией. Источник прав — активное Membership текущего workspace, включая SUPER_ADMIN. Любая серверная операция проверяет сессию заново; UI usePermissions не является защитой. Секрет AUTH_SECRET обязателен для реального входа, не должен иметь NEXT_PUBLIC-prefix. Внешний production использует HTTPS. Callback authorize возвращает User/null по контракту Auth.js; фасады/Server Actions возвращают Result и перехватывают исключения библиотеки.
+
+
+## App Configuration — TASK-025
+
+Settings — один singleton на workspace, EUR фиксирована. Чтение через `getAppConfiguration`, запись ADMIN+ с version и audit. Client modules получают общий ConfigurationProvider; даты выводить через `useAppFormat`, серверные — configuredDate/configuredTimestamp. DATE не превращать в локальный timestamp. Не использовать глобальное mutable состояние компании и не скрывать ошибки PostgreSQL defaults. Notification flags фильтруют in-app панель; audit остаётся полным.

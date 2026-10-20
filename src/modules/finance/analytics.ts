@@ -1,6 +1,7 @@
 import { getI18n } from "@/i18n/server";
 import { INVOICE_STATUS_LABELS } from "./presentation";
 import "server-only";
+import { workspaceToday } from "@/modules/settings/formatting";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { err, ok } from "@/lib/errors";
@@ -24,9 +25,9 @@ export async function getFinanceDashboard(currency: FinanceCurrency = "EUR"): Pr
   const parsed = financeCurrencySchema.safeParse(currency);
   if (!parsed.success) return err("VALIDATION", "Выберите валюту EUR");
   const workspaceId = context.data.workspaceId, code = parsed.data;
-  const asOf = new Date(), today = asOf.toISOString().slice(0, 10);
-  const monthStart = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), 1));
-  const months = Array.from({ length: 6 }, (_, index) => new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth() - 5 + index, 1)).toISOString().slice(0, 7));
+  const asOf = new Date(), today = workspaceToday(context.data.timezone, asOf);
+  const monthStart = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, 1));
+  const months = Array.from({ length: 6 }, (_, index) => new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1 - 5 + index, 1)).toISOString().slice(0, 7));
   // Each statement computes balances from receipts at the same cutoff; reads never mutate statuses.
   const facts = Prisma.sql`WITH paid AS (
     SELECT "invoiceId", SUM(amount) AS amount FROM invoice_payments
@@ -47,8 +48,7 @@ export async function getFinanceDashboard(currency: FinanceCurrency = "EUR"): Pr
         SELECT status, CASE WHEN age = 0 THEN 0 WHEN age <= 30 THEN 1 WHEN age <= 60 THEN 2 WHEN age <= 90 THEN 3 ELSE 4 END AS bucket,
           SUM(balance) AS amount, COUNT(*)::int AS count, COUNT(*) FILTER (WHERE balance > 0)::int AS "openCount"
         FROM facts GROUP BY status, bucket`),
-      db.$queryRaw<RevenueRow[]>`SELECT CASE WHEN p."receivedAt" >= ${new Date(`${months[0]}-01T00:00:00.000Z`)}
-          THEN to_char(p."receivedAt" AT TIME ZONE 'UTC', 'YYYY-MM') ELSE 'earlier' END AS month, SUM(p.amount) AS amount
+      db.$queryRaw<RevenueRow[]>`SELECT to_char(p."receivedAt" AT TIME ZONE ${context.data.timezone}, 'YYYY-MM') AS month, SUM(p.amount) AS amount
         FROM invoice_payments p JOIN "Invoice" i ON i.id = p."invoiceId" AND i."workspaceId" = p."workspaceId"
         WHERE p."workspaceId" = ${workspaceId} AND i."workspaceId" = ${workspaceId} AND i.currency = ${code}
           AND i.status::text NOT IN ('DRAFT', 'CANCELLED') AND p."receivedAt" <= ${asOf} GROUP BY month`,

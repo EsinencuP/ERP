@@ -111,8 +111,8 @@
 ## Новая очередь пользователя — ещё не реализовано
 
 - TASK-024: **реализовано** — `/settings/users`, `/settings/audit`, email/role invitation links, роли ADMIN+, деактивация/восстановление, last login, последние 100 tenant audit событий. Отчёт: [TASK-024.md](TASK-024.md).
-- TASK-025: DB Settings singleton — компания/логотип/валюта/часовой пояс/формат дат, глобальный Context, настройки уведомлений.
-- CHECKPOINT-04: TASK-018—025 после реализации Settings; build/tsc/RBAC/audit.
+- TASK-025: **реализовано** — tenant Settings singleton, компания/PNG logo/EUR/timezone/date format, глобальный Context, работающие notification toggles. [Отчёт](TASK-025.md).
+- CHECKPOINT-04: **пройден** — TASK-018—025, production build/tsc, HR/leave/Projects/Dashboard/Settings/RBAC/audit, 9/9 проверок нового checkpoint; регрессии CRM и Finance/Inventory также 9/9 каждая. [Отчёт](CHECKPOINT-04.md).
 - TASK-026: loading/error/empty/mobile/shortcuts/анимации — финальная проверка и доработка.
 - TASK-027: итоговый faker seed и Docker app/PostgreSQL 16.
 - TASK-028: финальные ADR-001—010, зависимости, RBAC и guide нового модуля.

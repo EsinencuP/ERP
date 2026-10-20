@@ -1,4 +1,5 @@
 "use client";
+import { useAppFormat } from "@/modules/settings/configuration-provider";
 import { useI18n } from "@/i18n/use-i18n";
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
@@ -25,13 +26,14 @@ type FormValues = z.input<typeof expenseFormSchema>;
 /** Create/edit an expense in a shared non-modal Sheet, keeping the opening version immutable. */
 export function ExpenseFormSheet({ expense: initialExpense, initialProjectId = "", onSaved, onClose, onReload, onReturnFocus }: { expense?: Expense; initialProjectId?: string; onSaved: (expense: Expense) => void; onClose: (needsReload?: boolean) => void; onReload: () => void; onReturnFocus: () => void }) {
   const { t } = useI18n();
+  const { today } = useAppFormat();
 
   const expense = useRef(initialExpense).current, id = useId(), saving = useRef(false);
   const selectedProjectId = expense?.projectId ?? initialProjectId, projectSelection = useRef(0);
   const [project, setProject] = useState<TaskProject | null>(selectedProjectId ? { id: selectedProjectId, code: "", name: t("Связанный проект") } : null), [projectError, setProjectError] = useState("");
   useEffect(() => { if (!selectedProjectId) return; let alive = true; const selection = projectSelection.current; getTaskProject(selectedProjectId).then((result) => { if (!alive || selection !== projectSelection.current) return; if (result.ok) setProject(result.data); else setProjectError(result.error.message); }).catch(() => { if (alive && selection === projectSelection.current) setProjectError(t("Не удалось прочитать название проекта; назначение сохранено")); }); return () => { alive = false; }; }, [selectedProjectId]);
   const [error, setError] = useState(""), [blocked, setBlocked] = useState(false);
-  const form = useForm<FormValues>({ resolver: zodResolver(expenseFormSchema), mode: "onBlur", reValidateMode: "onBlur", defaultValues: { projectId: selectedProjectId, title: expense?.title ?? "", amount: expense ? invoicePriceInput(expense.amount) : "", currency: "EUR", category: expense?.category ?? "OTHER", date: expense?.date ?? new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Moscow", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date()), receipt: expense?.receipt ?? "", notes: expense?.notes ?? "" } });
+  const form = useForm<FormValues>({ resolver: zodResolver(expenseFormSchema), mode: "onBlur", reValidateMode: "onBlur", defaultValues: { projectId: selectedProjectId, title: expense?.title ?? "", amount: expense ? invoicePriceInput(expense.amount) : "", currency: "EUR", category: expense?.category ?? "OTHER", date: expense?.date ?? today(), receipt: expense?.receipt ?? "", notes: expense?.notes ?? "" } });
   const pending = form.formState.isSubmitting, locked = pending || blocked;
   async function handleSubmit(input: FormValues) {
     if (saving.current || blocked) return;

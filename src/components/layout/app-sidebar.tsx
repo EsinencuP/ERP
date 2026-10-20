@@ -1,4 +1,6 @@
 "use client";
+import { useConfiguration } from "@/modules/settings/configuration-provider";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useI18n } from "@/i18n/use-i18n";
 
 
@@ -63,6 +65,7 @@ function SidebarNavigation({ pathname, collapsed, projectCount, inventoryAlert, 
 export function AppSidebar({ pathname, session, projectCount, inventoryAlert: initialAlert, leavePending: initialPending, onWorkspaceOpen, onSignOut }: { pathname: string; session: SessionContext; projectCount: number; inventoryAlert: Result<InventoryStockAlert> | null; leavePending: Result<number> | null; onWorkspaceOpen: () => void; onSignOut: () => void }) {
   const { t } = useI18n();
 
+  const { settings } = useConfiguration();
   const leavePending = useLeavePendingCount(initialPending, pathname);
   const [inventoryAlert, setInventoryAlert] = useState(initialAlert), request = useRef(0), lastPath = useRef(pathname);
   const enabled = initialAlert !== null;
@@ -92,7 +95,7 @@ export function AppSidebar({ pathname, session, projectCount, inventoryAlert: in
           <Link href="/" onClick={handleNavigate} className="motion flex min-w-0 items-center gap-2.5 rounded-lg p-1" aria-label={t("Evo ERP — главная")}><span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-primary text-primary-foreground"><Layers3 className="size-5" strokeWidth={2.5} /></span><span className={cn("whitespace-nowrap text-[23px] font-semibold tracking-[-.06em]", collapsed && "sr-only")}>{t("evo")}<span className="ml-1.5 text-[10px] font-medium uppercase tracking-[.14em] muted">{t("ERP")}</span></span></Link>
           {isMobile && <Button variant="ghost" size="icon" className="!size-11" onClick={handleNavigate} aria-label={t("Закрыть меню")}><X /></Button>}
         </div>
-        <button onClick={handleWorkspaceOpen} aria-label={t`Рабочее пространство: ${session.workspaceName}`} title={collapsed ? session.workspaceName : undefined} className={cn("motion flex h-16 w-full items-center gap-2.5 rounded-xl border bg-surface p-3 text-left transition-colors hover:bg-accent", collapsed && "!h-12 justify-center !gap-0 !p-0")}><span className="avatar size-8 shrink-0 rounded-lg text-[11px]">{initials(session.workspaceName)}</span><span className={collapsed ? "sr-only" : "min-w-0 flex-1"}><span className="block truncate text-xs font-medium">{session.workspaceName}</span><span className="mt-1 block text-[10px] muted">{t("Рабочее пространство")}</span></span>{!collapsed && <ChevronDown className="size-3 shrink-0 muted" />}</button>
+        <button onClick={handleWorkspaceOpen} aria-label={t`Рабочее пространство: ${settings.companyName}`} title={collapsed ? settings.companyName : undefined} className={cn("motion flex h-16 w-full items-center gap-2.5 rounded-xl border bg-surface p-3 text-left transition-colors hover:bg-accent", collapsed && "!h-12 justify-center !gap-0 !p-0")}><Avatar className="size-8 shrink-0 rounded-lg"><AvatarImage src={settings.logo ?? undefined} alt="" className="object-contain" /><AvatarFallback>{initials(settings.companyName)}</AvatarFallback></Avatar><span className={collapsed ? "sr-only" : "min-w-0 flex-1"}><span className="block truncate text-xs font-medium">{settings.companyName}</span><span className="mt-1 block text-[10px] muted">{t("Рабочее пространство")}</span></span>{!collapsed && <ChevronDown className="size-3 shrink-0 muted" />}</button>
       </SidebarHeader>
       <SidebarContent className="!overflow-x-hidden !overflow-y-auto"><SidebarNavigation pathname={pathname} collapsed={collapsed} projectCount={pathname.startsWith("/projects/documents") ? projectCount : null} inventoryAlert={inventoryAlert} leavePending={leavePending} onNavigate={handleNavigate} /></SidebarContent>
       <SidebarFooter className={cn("!gap-3 border-t !p-4", collapsed && "items-center !px-2")}>

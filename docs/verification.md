@@ -179,3 +179,8 @@ Docker и PostgreSQL CLI отсутствуют в доступной среде
 - Finance/Inventory regression: 9/9 PASS, fixture currencies обновлены на EUR. PDF en/ru просмотрен через Poppler, CSV EUR 120.00/20.00/100.00 проверен. Explicit demo conversion 30 records + idempotency: PASS.
 - EN/RU 1845 сообщений, совпадающие placeholders, нет отсутствующих статических t keys; нет any/console.log. Browser финального build: 0 pageerror/console warnings, light/dark, reduced motion, 375 px без внешнего overflow, Esc закрывает dialog.
 - Снимки и ограничения: [TASK-024.md](TASK-024.md). TASK-025/CHECKPOINT-04/05 остаются в очереди. Временные workspace и пользователи проверки удалены; исходные данные сохранены.
+
+
+## TASK-025 + CHECKPOINT-04 — 2026-10-20
+
+Settings singleton/Context, company/logo/EUR/timezone/date format, реальные notification toggles реализованы. Build/tsc/Prisma validate PASS; CHECKPOINT-04 9/9, CRM regression 9/9, Finance/Inventory regression 9/9. Seed создаёт singleton + audit атомарно и повторно не изменяет данные. Browser ADMIN/READONLY, EN/RU, 375 px, themes, logo upload, context propagation, notification filtering, HR/leave/Projects keyboard DnD/Main Dashboard/PDF проверены. Секреты и logo bytes не попадают в audit snapshots; повреждённый config не превращается в defaults. Подробности и доказательства — [CHECKPOINT-04.md](CHECKPOINT-04.md), [TASK-025.md](TASK-025.md). TASK-026—030 остаются в очереди.

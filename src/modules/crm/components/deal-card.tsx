@@ -1,4 +1,5 @@
 "use client";
+import { useAppFormat } from "@/modules/settings/configuration-provider";
 import { useI18n } from "@/i18n/use-i18n";
 
 
@@ -9,7 +10,7 @@ import { enUS, ru } from "date-fns/locale";
 import { Building2, CalendarDays, GripVertical, History, Loader2 } from "lucide-react";
 import type { DealStage } from "@prisma/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { cn, dateLabel, formatCurrency, initials } from "@/lib/utils";
+import { cn, formatCurrency, initials } from "@/lib/utils";
 import { DEAL_STAGES } from "../schema";
 import { getPipelineStage, PIPELINE_STAGES } from "../pipeline";
 import type { PipelineDeal } from "../types";
@@ -19,6 +20,7 @@ type CardProps = { deal: PipelineDeal; now: string; disabled: boolean; pending: 
 /** Plain card content shared with DragOverlay; never registers a second draggable. */
 export function DealCardContent({ deal, now, pending, controls }: { deal: PipelineDeal; now: string; pending: boolean; controls?: React.ReactNode }) {
   const { t , locale: uiLocale } = useI18n();
+  const { dateLabel } = useAppFormat();
 
   const stage = PIPELINE_STAGES[deal.stage];
   const amount = formatCurrency(deal.value, deal.currency, uiLocale);
@@ -36,6 +38,7 @@ export function DealCardContent({ deal, now, pending, controls }: { deal: Pipeli
 /** Register one sortable deal, with a dedicated drag handle and an accessible stage alternative. */
 export function DealCard({ deal, now, disabled, pending, onMove }: CardProps) {
   const { t } = useI18n();
+  const { dateLabel } = useAppFormat();
 
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: deal.id, disabled, data: { stage: deal.stage, type: "deal" } });
   return <article ref={setNodeRef} aria-label={t`Сделка: ${deal.title}`} aria-busy={pending} data-deal-id={deal.id} data-stage={deal.stage} className={cn("motion-fade relative rounded-xl border bg-surface p-4 shadow-sm", isDragging && "opacity-25", pending && "border-primary/50")} style={{ transform: CSS.Transform.toString(transform), transition }}>

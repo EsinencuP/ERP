@@ -69,3 +69,6 @@ TASK-023: [TailAdmin](https://tailadmin.com/) — компактный KPI row �
 
 
 TASK-024: [Aureus user management](https://docs.aureuserp.com/master/general-settings/users/manage-users.html), [Aureus policies](https://devdocs.aureuserp.com/master/plugins/policies.html), Twenty [workspace membership deactivation](https://github.com/twentyhq/twenty/issues/2848) и [inviting existing accounts](https://github.com/twentyhq/twenty/issues/6606). Применены tenant Membership вместо глобального отключения User, приглашение email+роль, копируемая ссылка и серверная RBAC-защита. Код не копировался. Проверка React Best Practices: параллельные чтения, минимальные secret-free DTO, server authorization, строгие типы, labels/focus/keyboard, responsive table scroll.
+
+
+TASK-025: переиспользованы tenant patterns TASK-024 и shared form/UI primitives. React Context проверен через Context7 по [React Server Components context provider](https://github.com/reactjs/react.dev/blob/main/src/content/reference/rsc/server-components.md) и [useContext](https://react.dev/reference/react/useContext). Provider — Client Component, layout передаёт serializable DB snapshot, обновления не смешивают tenants; код референсов не копировался.

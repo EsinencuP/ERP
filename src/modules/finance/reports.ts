@@ -34,7 +34,7 @@ async function readPnlReport(filters: PnlFilters, exporting: boolean): Promise<R
     FROM "Invoice" i JOIN payments p ON p."invoiceId" = i.id
     WHERE i."workspaceId" = ${workspaceId} AND i.currency = ${currency}
       AND i.status::text NOT IN ('DRAFT', 'CANCELLED') AND i.total > 0 AND p.amount >= i.total
-      AND (p."paidAt" AT TIME ZONE ${PNL_TIMEZONE})::date BETWEEN ${from}::date AND ${to}::date
+      AND (p."paidAt" AT TIME ZONE ${context.data.timezone})::date BETWEEN ${from}::date AND ${to}::date
     UNION ALL
     SELECT 'expense' AS kind, e.category::text AS category, SUM(e.amount) AS amount, COUNT(*)::int AS count
     FROM "Expense" e WHERE e."workspaceId" = ${workspaceId} AND e.currency = ${currency}
@@ -42,7 +42,7 @@ async function readPnlReport(filters: PnlFilters, exporting: boolean): Promise<R
     const revenueRow = rows.find((row) => row.kind === "revenue"), revenue = revenueRow?.amount.toFixed(0) ?? "0";
     const categories = EXPENSE_CATEGORIES.map((category) => { const row = rows.find((item) => item.kind === "expense" && item.category === category); return { category, amount: row?.amount.toFixed(0) ?? "0", count: row?.count ?? 0 }; });
     const expenses = categories.reduce((sum, row) => sum + BigInt(row.amount), 0n);
-    return ok({ from, to, currency, asOf: asOf.toISOString(), revenue, expenses: expenses.toString(), netProfit: (BigInt(revenue) - expenses).toString(), invoiceCount: revenueRow?.count ?? 0, expenseCount: categories.reduce((sum, row) => sum + row.count, 0), categories });
+    return ok({ from, to, currency, timezone: context.data.timezone, asOf: asOf.toISOString(), revenue, expenses: expenses.toString(), netProfit: (BigInt(revenue) - expenses).toString(), invoiceCount: revenueRow?.count ?? 0, expenseCount: categories.reduce((sum, row) => sum + row.count, 0), categories });
   } catch (error: unknown) { return getFinanceError(error); }
 }
 
@@ -55,7 +55,7 @@ export async function getPnlExport(filters: PnlFilters): Promise<Result<(string 
   const data = result.data;
   const { t } = await getI18n();
   return ok([
-    [t("Отчёт"), "P&L"], [t("С"), data.from], [t("По (включительно)"), data.to], [t("Часовой пояс"), PNL_TIMEZONE],
+    [t("Отчёт"), "P&L"], [t("С"), data.from], [t("По (включительно)"), data.to], [t("Часовой пояс"), data.timezone],
     [t("Валюта"), data.currency], [t("Сформирован (UTC)"), data.asOf],
     [t("Revenue basis"), t("Полные суммы счетов с налогом по дате окончательной оплаты; частичные оплаты исключены")],
     [t("Показатель"), t`Сумма, ${data.currency}`, t("Количество")],

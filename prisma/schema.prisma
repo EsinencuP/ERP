@@ -150,6 +150,21 @@ model Workspace {
   projects         Project[]
   tasks            Task[]
   invitations      WorkspaceInvitation[]
+  settings         Settings?
+}
+
+// One configuration per tenant; creation defaults do not authorize cross-workspace access.
+model Settings {
+  workspaceId     String @id
+  companyName     String @db.VarChar(160)
+  logo            String? @db.Text
+  currency        String @default("EUR") @db.Char(3)
+  timezone        String @default("Europe/Moscow") @db.VarChar(100)
+  dateFormat      String @default("yyyy-MM-dd") @db.VarChar(32)
+  notifications   Json
+  version         Int @default(1)
+  updatedAt       DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
 }
 
 model User {

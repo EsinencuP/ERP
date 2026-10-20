@@ -16,7 +16,7 @@ export type InvoicePaymentInput = z.input<typeof import("./schema").invoicePayme
 
 export type FinanceCurrency = z.infer<typeof import("./schema").financeCurrencySchema>;
 export type PnlFilters = z.input<typeof import("./schema").pnlFiltersSchema>;
-export type PnlReport = { from: string; to: string; currency: FinanceCurrency; asOf: string; revenue: string; expenses: string; netProfit: string; invoiceCount: number; expenseCount: number; categories: { category: ExpenseCategory; amount: string; count: number }[] };
+export type PnlReport = { timezone: string; from: string; to: string; currency: FinanceCurrency; asOf: string; revenue: string; expenses: string; netProfit: string; invoiceCount: number; expenseCount: number; categories: { category: ExpenseCategory; amount: string; count: number }[] };
 export type PaymentFilters = z.input<typeof import("./schema").paymentFiltersSchema>;
 export type PaymentRow = InvoicePayment & { invoiceId: string; invoiceNumber: string; currency: string; customerName: string; receivedBy: string | null };
 export type ExpenseCategory = z.infer<typeof import("./schema").expenseCategorySchema>;

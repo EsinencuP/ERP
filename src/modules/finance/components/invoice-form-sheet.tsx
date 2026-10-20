@@ -1,4 +1,5 @@
 "use client";
+import { useAppFormat } from "@/modules/settings/configuration-provider";
 import { useI18n } from "@/i18n/use-i18n";
 
 import { useRef, useState, type KeyboardEvent } from "react";
@@ -21,10 +22,11 @@ import { InvoiceContactPicker } from "./invoice-contact-picker";
 type FormValues = z.input<typeof invoiceFormSchema>;
 /** Edit invoice lines inline with exact live totals and server-authoritative aggregate validation. */
 export function InvoiceFormSheet({ invoice: initialInvoice, onSaved, onClose }: { invoice?: Invoice; onSaved: (invoice: Invoice) => void; onClose: () => void }) {
+  const { today: currentDay } = useAppFormat();
   const { t , locale: uiLocale } = useI18n();
 
   const invoice = useRef(initialInvoice).current;
-  const today = new Date().toISOString().slice(0, 10), opener = useRef<HTMLElement | null>(null), saving = useRef(false);
+  const today = currentDay(), opener = useRef<HTMLElement | null>(null), saving = useRef(false);
   const [error, setError] = useState(""); const [blocked, setBlocked] = useState(false);
   const form = useForm<FormValues>({ resolver: zodResolver(invoiceFormSchema), mode: "onBlur", reValidateMode: "onBlur", defaultValues: { contactId: invoice?.contactId ?? "", currency: "EUR", issueDate: invoice?.issueDate ?? today, dueDate: invoice?.dueDate ?? today, taxRate: invoice?.taxRate ?? "0", notes: invoice?.notes ?? "", items: invoice?.items.map((item) => ({ description: item.description, quantity: item.quantity, unitPrice: invoicePriceInput(item.unitPrice) })) ?? [{ description: "", quantity: "1", unitPrice: "0.00" }] } });
   const lines = useFieldArray({ control: form.control, name: "items" }), values = form.watch(), pending = form.formState.isSubmitting;
