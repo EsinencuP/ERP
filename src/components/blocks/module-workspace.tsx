@@ -1,4 +1,5 @@
 "use client";
+import { useNewRecordAction } from "@/components/layout/new-record-provider";
 import { useI18n } from "@/i18n/use-i18n";
 
 
@@ -46,7 +47,7 @@ export function ModuleWorkspace({ domain, initialState, session }: { domain: Dom
   const canWrite = canWriteRole(role);
 
   useEffect(() => { setState(initialState); }, [initialState]);
-  useEffect(() => { setQuery(searchParams.get("q") ?? ""); if (searchParams.get("create") === "1" && canWrite) { setEditing(null); setFormOpen(true); router.replace(`/${domain}`); } }, [domain, canWrite, searchParams, router]);
+  useEffect(() => { setQuery(searchParams.get("q") ?? ""); }, [searchParams]);
 
   const rows = state.documents.filter((row) => row.domain === domain);
   const filtered = rows.filter((row) => (status === "all" || row.data.status === status) && `${row.data.title} ${row.data.subtitle} ${row.data.email}`.toLowerCase().includes(query.toLowerCase()));
@@ -59,6 +60,7 @@ export function ModuleWorkspace({ domain, initialState, session }: { domain: Dom
   function handleRowEdit(record: DocumentRecord) { setEditing(record); setFormOpen(true); }
   function handleRowDelete(record: DocumentRecord) { setDeleting(record); setDeleteError(""); }
   function handleCreate() { setEditing(null); setFormOpen(true); }
+  useNewRecordAction(`${t("Добавить ")}${t(definition.singular)}`, handleCreate, canWrite && !formOpen && !deleting && !paying && !busy);
 
   async function handleSave(data: RecordData) {
     try { const result = editing ? await actions[domain].update(editing.id, editing.version, data) : await actions[domain].create(data); if (result.ok) handleRecordSaved(result.data); return result; }

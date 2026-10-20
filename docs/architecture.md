@@ -363,3 +363,14 @@ Dashboard layout параллельно читает configuration и остал
 Общий useAppFormat/configuredDate/configuredTimestamp даёт формат дат и IANA timezone в модулях, статусах входа, движениях, audit и PDF. DATE YYYY-MM-DD остаётся календарной датой; timezone применяется к instant timestamps. Task dueDate сохраняет прежнюю календарную семантику. Finance overdue/day/month/MTD и P&L применяют workspace timezone; CSV указывает фактический пояс. Валидация timezone сверяет Intl и PostgreSQL pg_timezone_names.
 
 Переключатели created/updated/deleted/payment управляют панелью in-app notifications и индикатором Header. Audit хранится полностью, operational stock/leave badges сохраняют бизнес-смысл. В Events добавлен settings domain. Email/push transport не заявляется и не имитируется.
+
+
+## TASK-026 — Route feedback and workspace commands
+
+Every UI page has a loading.tsx boundary; shared table/detail/dashboard/form/board skeletons keep narrow screens within the viewport. Root loading also covers asynchronous dashboard layout reads. Root and auth/dashboard group error.tsx files share a client RouteError with retry/refresh and an opaque digest; raw exceptions are never rendered. Expected Result failures continue through ErrorPanel and never become empty lists.
+
+AppShell owns one global Cmd/Ctrl+K and Cmd/Ctrl+N listener. CommandPalette is a separate dynamic chunk, mounted on first use; it reuses the installed cmdk/Shadcn primitives. It searches pages, role-aware create actions and the existing Document registry. Document matching scans the existing tenant snapshot and mounts at most eight results only after a query is entered. Normalized entity search is not claimed. Legacy document links preserve their actual /documents routes. Radix owns Escape/focus trapping, and command execution follows dialog closure to avoid overlapping traps.
+
+NewRecordProvider/useNewRecordAction register the current route's existing create form and eligibility (role, busy state, open dialogs, active product). A shared create=1 navigation intent opens that same form once and removes only that parameter, preserving filters and hashes. Cmd/Ctrl+N ignores typing, IME/repeat and open forms; overview/detail routes without their own action use their module's primary create workflow. Dashboard/settings without a create workflow open the palette. UI affordances do not replace server RBAC.
+
+The existing Sidebar Sheet breakpoint remains strictly below 768px. Escape and navigation restore focus and close the mobile layer; palette opening closes the sidebar first. EmptyState has one token-based illustration and optional contextual action. Dialog/confirmation entrance effects use opacity to preserve positioning and DnD transforms; existing reduced-motion overrides apply to all entrance and skeleton animation.

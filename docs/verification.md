@@ -184,3 +184,12 @@ Docker и PostgreSQL CLI отсутствуют в доступной среде
 ## TASK-025 + CHECKPOINT-04 — 2026-10-20
 
 Settings singleton/Context, company/logo/EUR/timezone/date format, реальные notification toggles реализованы. Build/tsc/Prisma validate PASS; CHECKPOINT-04 9/9, CRM regression 9/9, Finance/Inventory regression 9/9. Seed создаёт singleton + audit атомарно и повторно не изменяет данные. Browser ADMIN/READONLY, EN/RU, 375 px, themes, logo upload, context propagation, notification filtering, HR/leave/Projects keyboard DnD/Main Dashboard/PDF проверены. Секреты и logo bytes не попадают в audit snapshots; повреждённый config не превращается в defaults. Подробности и доказательства — [CHECKPOINT-04.md](CHECKPOINT-04.md), [TASK-025.md](TASK-025.md). TASK-026—030 остаются в очереди.
+
+
+## TASK-026 — 2026-10-20
+
+Production build / npx tsc --noEmit / git diff --check: PASS. Loading siblings — 31/31 UI routes; root/auth/dashboard error boundaries. Каталоги EN/RU — 1934 пары, отсутствующих static t keys/placeholder mismatches/кириллических EN значений нет. Нет : any, console.log и hex в components. Новые test-файлы не добавлены.
+
+Browser → production Next → реальная локальная PostgreSQL: Cmd/Ctrl+N на основных списках, palette → form, nested fallback, один product/audit после сохранения, readonly guards, typing/modal suppression, фильтры/hash/create intent, cap8 и поиск 12-го legacy document, верные /documents links, reset search, Escape/focus: PASS. 375 px/767/768, RU/dark и reduced motion: PASS. Искусственный RSC rejection в browser response показал безопасную границу; Try again восстановил страницу. Финальный обычный smoke — без неожиданных pageerror.
+
+Собственные fixtures удалены, исходные 6 invoices/118 conversion audits сохранены; локальные helper-сервисы остановлены. Внешний deployment не проверялся. Подробности и screenshots: [TASK-026.md](TASK-026.md). TASK-027—030/CHECKPOINT-05 остаются в очереди.

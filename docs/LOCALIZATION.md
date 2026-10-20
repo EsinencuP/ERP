@@ -63,3 +63,6 @@ CRM, ERP, SKU, P&L, Kanban, API, валютные и технические ко
 Финальная production-сборка и npx tsc --noEmit прошли. Сверены все 1721 пары каталогов: отсутствующих t-сообщений и некорректных placeholders нет; английские значения без кириллицы. Проверены READONLY → смена языка, 403 PDF en/ru, пустая/неверная cookie → en, русская 404. На 375 px горизонтального переполнения нет, обе темы и reduced motion работают; неожиданных pageerror в production-проверке нет. PDF en/ru скачаны, отрисованы Poppler и визуально проверены; CSV содержит выбранные заголовки и категории.
 
 Новые снимки: [EN Dashboard](screenshots/localization-complete-dashboard-en.png), [RU Dashboard](screenshots/localization-complete-dashboard-ru.png), [RU Kanban](screenshots/localization-complete-projects-ru.png), [EN Profile](screenshots/localization-complete-profile-en.png), [RU 375 px / dark](screenshots/localization-complete-settings-mobile.png).
+
+
+TASK-026: палитра, новые create-команды, route loading/error и empty actions покрыты общими EN/RU каталогами. Всего 1934 пары; static-key/placeholder audit пройден. Русские команды и поиск «Новый счёт» проверены в браузере; пользовательские названия документов не переводятся.

@@ -72,3 +72,6 @@ TASK-024: [Aureus user management](https://docs.aureuserp.com/master/general-set
 
 
 TASK-025: переиспользованы tenant patterns TASK-024 и shared form/UI primitives. React Context проверен через Context7 по [React Server Components context provider](https://github.com/reactjs/react.dev/blob/main/src/content/reference/rsc/server-components.md) и [useContext](https://react.dev/reference/react/useContext). Provider — Client Component, layout передаёт serializable DB snapshot, обновления не смешивают tenants; код референсов не копировался.
+
+
+TASK-026: переиспользованы существующие Shadcn Command/Sheet/Dialog и cmdk 1.1.1. API сверены с установленными README/types и Context7; [cmdk](https://github.com/pacocoursey/cmdk) — controlled Input, List/Item/select и встроенная клавиатура. Файловые границы сверены с [Next.js 15 loading](https://github.com/vercel/next.js/blob/v15.1.8/docs/01-app/02-building-your-application/01-routing/06-loading-ui-and-streaming.mdx) и [error](https://github.com/vercel/next.js/blob/v15.1.8/docs/01-app/03-api-reference/03-file-conventions/error.mdx). Применены master-skill, frontend craft/anti-slop, React Best Practices и browser verification; новые зависимости и код внешних ERP не добавлялись.
