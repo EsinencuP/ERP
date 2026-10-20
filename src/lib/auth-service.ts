@@ -9,7 +9,7 @@ import { err, ok } from "@/lib/errors";
 import { verifyPassword } from "@/lib/password";
 import type { Result, SessionContext } from "@/types/shared";
 
-export const loginSchema = z.object({ email: z.string().trim().email().max(200), password: z.string().min(1).max(200) });
+export const loginSchema = z.object({ email: z.string().trim().email().max(200), password: z.string().min(1).max(200), invitationToken: z.string().regex(/^[a-f0-9]{64}$/).optional() });
 export const SESSION_MAX_AGE = 12 * 60 * 60;
 const dummyHash = `${"0".repeat(32)}:${"0".repeat(128)}`;
 
@@ -30,12 +30,21 @@ export async function getCredentialUser(input: unknown): Promise<Result<User>> {
   if (!parsed.success) return err("VALIDATION", "Введите корректный email и пароль");
   if (isDemoMode()) return err("UNAUTHORIZED", "В деморежиме используйте кнопку входа в демопространство");
   try {
-    const user = await db.user.findUnique({ where: { email: parsed.data.email.toLowerCase() }, include: { memberships: { where: { isActive: true }, orderBy: { workspaceId: "asc" }, take: 1, include: { workspace: true } } } });
+    const invitation = parsed.data.invitationToken ? await db.workspaceInvitation.findUnique({ where: { tokenHash: createHash("sha256").update(parsed.data.invitationToken).digest("hex") }, select: { workspaceId: true, email: true, status: true } }) : null;
+    if (parsed.data.invitationToken && (!invitation || invitation.status !== "ACCEPTED" || invitation.email !== parsed.data.email.toLowerCase())) return err("UNAUTHORIZED", "Invalid invitation sign-in");
+    const user = await db.user.findUnique({ where: { email: parsed.data.email.toLowerCase() }, include: { memberships: { where: { isActive: true, ...(invitation ? { workspaceId: invitation.workspaceId } : {}) }, orderBy: [{ lastLoginAt: { sort: "desc", nulls: "last" } }, { workspaceId: "asc" }], take: 1, include: { workspace: true } } } });
     const verified = verifyPassword(parsed.data.password, user?.passwordHash ?? dummyHash);
     const member = user?.memberships[0];
     if (!user?.isActive || !member || !verified.ok || !verified.data) return err("UNAUTHORIZED", "Неверный email или пароль либо доступ отключён");
     const sessionId = createHash("sha256").update(randomBytes(32)).digest("hex");
-    await db.session.create({ data: { tokenHash: sessionId, userId: user.id, workspaceId: member.workspaceId, expiresAt: new Date(Date.now() + SESSION_MAX_AGE * 1000) } });
+    const registered = await db.$transaction(async (tx) => {
+      const current = await tx.membership.findUnique({ where: { userId_workspaceId: { userId: user.id, workspaceId: member.workspaceId } }, include: { user: { select: { isActive: true } } } });
+      if (!current?.isActive || !current.user.isActive || current.role !== member.role) return err("UNAUTHORIZED", "Membership changed during sign-in");
+      await tx.membership.update({ where: { userId_workspaceId: { userId: user.id, workspaceId: member.workspaceId } }, data: { lastLoginAt: new Date() } });
+      await tx.session.create({ data: { tokenHash: sessionId, userId: user.id, workspaceId: member.workspaceId, expiresAt: new Date(Date.now() + SESSION_MAX_AGE * 1000) } });
+      return ok(true as const);
+    }, { isolationLevel: "Serializable" });
+    if (!registered.ok) return registered;
     return ok({ id: user.id, name: user.name, email: user.email, image: user.avatar, role: member.role, workspaceId: member.workspaceId, workspaceName: member.workspace.name, sessionId });
   } catch { return err("STORAGE", "Сервис входа недоступен. Проверьте подключение к PostgreSQL"); }
 }

@@ -1,6 +1,6 @@
 import type { DashboardActivity } from "./types";
 
-export const DASHBOARD_DOMAINS: Readonly<Record<string, { label: string; href: string }>> = { crm: { label: "CRM", href: "/crm/pipeline" }, finance: { label: "Finance", href: "/finance" }, inventory: { label: "Inventory", href: "/inventory" }, hr: { label: "HR", href: "/hr" }, projects: { label: "Projects", href: "/projects/overview" } };
+export const DASHBOARD_DOMAINS: Readonly<Record<string, { label: string; href: string }>> = { settings: { label: "Settings", href: "/settings/audit" }, crm: { label: "CRM", href: "/crm/pipeline" }, finance: { label: "Finance", href: "/finance" }, inventory: { label: "Inventory", href: "/inventory" }, hr: { label: "HR", href: "/hr" }, projects: { label: "Projects", href: "/projects/overview" } };
 export const DASHBOARD_ACTIONS: Readonly<Record<string, string>> = { created: "добавил(а) запись", updated: "обновил(а) запись", deleted: "удалил(а) запись", payment: "зарегистрировал(а) оплату", approved: "согласовал(а) заявку", rejected: "отклонил(а) заявку" };
 
 /** Link recognized audit entities safely, routing deletions and unsupported entity types to their module. */

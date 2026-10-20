@@ -15,7 +15,7 @@ import { defaultRecord } from "@/lib/record-schema";
 import { modules, schemas } from "@/lib/modules";
 import type { DocumentRecord, Domain, RecordData, Result } from "@/types/shared";
 
-/** Shared DocType form with RHF, Zod validation and precise ruble-to-kopeck conversion. */
+/** Shared DocType form with RHF, Zod validation and precise euro-to-cent conversion. */
 export function RecordForm({ domain, record, onSave, onClose }: { domain: Domain; record: DocumentRecord | null; onSave: (data: RecordData) => Promise<Result<DocumentRecord>>; onClose: () => void }) {
   const { t } = useI18n();
 

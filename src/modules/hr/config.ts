@@ -44,7 +44,7 @@ export const definition = {
     },
     {
       "key": "amount",
-      "label": "Зарплата, ₽",
+      "label": "Зарплата, €",
       "type": "money"
     },
     {

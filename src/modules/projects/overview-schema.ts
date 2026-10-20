@@ -3,7 +3,7 @@ import { FINANCE_CURRENCIES, invoiceMajorPriceSchema } from "@/modules/finance/s
 import { taskIdSchema, taskSchema, taskProjectSchema } from "./task-schema";
 
 export const PROJECT_STATUSES = ["PLANNING", "ACTIVE", "ON_HOLD", "COMPLETED", "CANCELLED"] as const;
-const projectFields = taskProjectSchema.extend({ description: z.string().trim().max(4000).default(""), status: z.enum(PROJECT_STATUSES), budget: z.string().regex(/^\d{1,20}$/, "Бюджет: целые копейки, до 20 цифр"), currency: z.enum(FINANCE_CURRENCIES), managerId: z.string().max(128).default(""), startDate: taskSchema.shape.dueDate, endDate: taskSchema.shape.dueDate });
+const projectFields = taskProjectSchema.extend({ description: z.string().trim().max(4000).default(""), status: z.enum(PROJECT_STATUSES), budget: z.string().regex(/^\d{1,20}$/, "Бюджет: целые евроценты, до 20 цифр"), currency: z.enum(FINANCE_CURRENCIES), managerId: z.string().max(128).default(""), startDate: taskSchema.shape.dueDate, endDate: taskSchema.shape.dueDate });
 const validPeriod = (value: { startDate?: string; endDate?: string }) => !value.startDate || !value.endDate || value.endDate >= value.startDate;
 const periodMessage = { path: ["endDate"], message: "Окончание не раньше начала проекта" };
 export const overviewProjectSchema = projectFields.refine(validPeriod, periodMessage);

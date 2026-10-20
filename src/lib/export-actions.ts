@@ -29,11 +29,11 @@ export async function getExportReport(period: unknown): Promise<Result<(string |
   const outstanding = invoices.filter((row) => row.data.status !== "Черновик").reduce((sum, row) => sum + Math.max(0, row.data.amount - (paid.get(row.id) ?? 0)), 0);
   return localizeResult(await ok([
     ["Показатель", "Значение"], ["Период, дней", days],
-    ["Поступления, ₽", receipts.reduce((sum, row) => sum + row.amount, 0) / 100],
-    ["К оплате, ₽", outstanding / 100],
+    ["Поступления, €", receipts.reduce((sum, row) => sum + row.amount, 0) / 100],
+    ["К оплате, €", outstanding / 100],
     ["Активные сделки", state.data.documents.filter((row) => row.domain === "crm" && !["Выиграна", "Проиграна"].includes(row.data.status)).length],
     ["Активные проекты", state.data.documents.filter((row) => row.domain === "projects" && row.data.status !== "Завершён").length],
-    [], ["Дата поступления", "Счёт", "Сумма, ₽"],
+    [], ["Дата поступления", "Счёт", "Сумма, €"],
     ...receipts.map((row) => [row.createdAt, invoices.find((invoice) => invoice.id === row.documentId)?.data.title ?? row.documentId, row.amount / 100]),
   ]));
 }

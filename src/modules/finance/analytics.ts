@@ -18,11 +18,11 @@ type ClientRow = { id: string; name: string; amount: Prisma.Decimal };
 type RecentRow = { id: string; number: string; customerName: string; status: InvoiceStatus; dueDate: Date; total: Prisma.Decimal; balance: Prisma.Decimal };
 
 /** Aggregate normalized receipts and receivables using four parallel, tenant-scoped SQL statements. */
-export async function getFinanceDashboard(currency: FinanceCurrency = "RUB"): Promise<Result<FinanceDashboardData>> {
+export async function getFinanceDashboard(currency: FinanceCurrency = "EUR"): Promise<Result<FinanceDashboardData>> {
   const context = await getFinanceContext();
   if (!context.ok) return context;
   const parsed = financeCurrencySchema.safeParse(currency);
-  if (!parsed.success) return err("VALIDATION", "Выберите валюту RUB, USD или EUR");
+  if (!parsed.success) return err("VALIDATION", "Выберите валюту EUR");
   const workspaceId = context.data.workspaceId, code = parsed.data;
   const asOf = new Date(), today = asOf.toISOString().slice(0, 10);
   const monthStart = new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth(), 1));
@@ -79,7 +79,7 @@ export async function getFinanceDashboard(currency: FinanceCurrency = "RUB"): Pr
 }
 
 /** Preserve dashboard CSV export using fresh normalized aggregates and server-side canExport. */
-export async function getFinanceExport(currency: FinanceCurrency = "RUB"): Promise<Result<(string | number)[][]>> {
+export async function getFinanceExport(currency: FinanceCurrency = "EUR"): Promise<Result<(string | number)[][]>> {
   const context = await getFinanceContext(); if (!context.ok) return context;
   if (!hasPermission(context.data.role, "canExport")) return err("FORBIDDEN", "Нет права на экспорт финансового отчёта");
   const result = await getFinanceDashboard(currency); if (!result.ok) return result;

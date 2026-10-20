@@ -28,7 +28,7 @@ export const definition = {
     },
     {
       "key": "amount",
-      "label": "Цена за единицу, ₽",
+      "label": "Цена за единицу, €",
       "type": "money",
       "required": true
     },

@@ -10,6 +10,7 @@ export function createDemoState(): WorkspaceState {
   const add = (domain: Domain, data: Partial<RecordData> & Pick<RecordData, "title" | "subtitle" | "status">, daysAgo = 0) => {
     const createdAt = new Date(Date.now() - daysAgo * 86400000).toISOString();
     const record: DocumentRecord = { id: `demo-${domain}-${documents.length + 1}`, workspaceId: "demo-workspace", domain, version: 1, createdAt, updatedAt: createdAt, data: { ...defaultRecord, ...data } };
+    record.data.amount = Math.round(record.data.amount / 93);
     documents.push(record);
     return record;
   };
@@ -47,10 +48,10 @@ export function createDemoState(): WorkspaceState {
   add("projects", { title: "Бренд Культура", subtitle: "Анна Белова", status: "Планирование", amount: 32000000, progress: 10, date: day(30) }, 2);
   const payments = [
     { id: "demo-payment-1", documentId: paid.id, workspaceId: "demo-workspace", amount: paid.data.amount, createdAt: new Date(Date.now() - 3 * 86400000).toISOString(), reference: "demo-receipt-1" },
-    { id: "demo-payment-2", documentId: partial.id, workspaceId: "demo-workspace", amount: 15000000, createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), reference: "demo-receipt-2" },
+    { id: "demo-payment-2", documentId: partial.id, workspaceId: "demo-workspace", amount: Math.round(15000000 / 93), createdAt: new Date(Date.now() - 2 * 86400000).toISOString(), reference: "demo-receipt-2" },
     { id: "demo-payment-3", documentId: paid2.id, workspaceId: "demo-workspace", amount: paid2.data.amount, createdAt: new Date(Date.now() - 10 * 86400000).toISOString(), reference: "demo-receipt-3" },
   ];
-  return { documents, payments, events: [
+  return { baseCurrency: "EUR", documents, payments, events: [
     { id: "demo-event-1", workspaceId: "demo-workspace", actor: "Ольга Иванова", domain: "finance", action: "payment", title: "Оплата по счёту INV-2026-041", createdAt: stamp },
     { id: "demo-event-2", workspaceId: "demo-workspace", actor: "Елена Смирнова", domain: "projects", action: "updated", title: "Лендинг Mono", createdAt: new Date(Date.now() - 3600000).toISOString() },
     { id: "demo-event-3", workspaceId: "demo-workspace", actor: "Александр Волков", domain: "crm", action: "created", title: "Брендинг и стратегия", createdAt: new Date(Date.now() - 7200000).toISOString() },

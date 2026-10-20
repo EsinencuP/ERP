@@ -15,7 +15,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: SESSION_MAX_AGE },
   pages: { signIn: "/login", error: "/login" },
   providers: [Credentials({
-    credentials: { email: { label: "Email", type: "email" }, password: { label: "Пароль", type: "password" } },
+    credentials: { email: { label: "Email", type: "email" }, password: { label: "Password", type: "password" }, invitationToken: { type: "hidden" } },
     async authorize(credentials) {
       const result = await getCredentialUser(credentials);
       return result.ok ? result.data : null;

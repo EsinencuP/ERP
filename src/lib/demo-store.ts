@@ -10,6 +10,7 @@ import type { Result, WorkspaceState } from "@/types/shared";
 const root = path.join(process.cwd(), ".data");
 const file = path.join(root, "demo-workspace.json");
 const stateSchema = z.object({
+  baseCurrency: z.literal("EUR").optional(),
   documents: z.array(z.object({ id: z.string(), workspaceId: z.literal("demo-workspace"), domain: domainSchema, version: z.number().int().positive(), createdAt: z.string(), updatedAt: z.string(), data: baseRecordSchema })),
   events: z.array(z.object({ id: z.string(), workspaceId: z.literal("demo-workspace"), actor: z.string(), domain: domainSchema, action: z.enum(["created", "updated", "deleted", "payment"]), title: z.string(), createdAt: z.string() })),
   payments: z.array(z.object({ id: z.string(), workspaceId: z.literal("demo-workspace"), documentId: z.string(), amount: z.number().int().positive(), reference: z.string(), createdAt: z.string() })),
@@ -25,7 +26,15 @@ export async function withDemoState<T>(handleOperation: (state: WorkspaceState) 
       try {
         const parsed = stateSchema.safeParse(JSON.parse(await readFile(file, "utf8")) as unknown);
         if (!parsed.success) return failure("STORAGE", "Файл демоданных повреждён. Восстановите его из резервной копии");
-        state = parsed.data;
+        state = { documents: parsed.data.documents, events: parsed.data.events, payments: parsed.data.payments, ...(parsed.data.baseCurrency ? { baseCurrency: parsed.data.baseCurrency } : {}) };
+        if (!state.baseCurrency) {
+          const documents = structuredClone(state.documents), payments = structuredClone(state.payments);
+          for (const row of documents) { row.data.amount = Math.round(row.data.amount / 93); row.version++; }
+          for (const row of payments) { row.amount = Math.round(row.amount / 93); if (row.amount <= 0) return failure("STORAGE", "A demo payment cannot be represented in euro cents"); }
+          state = { ...state, documents, payments, baseCurrency: "EUR" };
+          await writeFile(`${file}.tmp`, JSON.stringify(state, null, 2), "utf8");
+          await rename(`${file}.tmp`, file);
+        }
       } catch (error: unknown) {
         if (typeof error !== "object" || error === null || !("code" in error) || error.code !== "ENOENT") return failure("STORAGE", "Не удалось прочитать демоданные");
         state = createDemoState();

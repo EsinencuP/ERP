@@ -16,9 +16,9 @@ function revalidateFinance<T>(result: Result<T>) { if (result.ok) { try { revali
 /** Read a validated period of normalized P&L with live workspace authorization. */
 export async function getPnlReport(filters: PnlFilters) { return localizeResult(await reports.getPnlReport(filters)); }
 /** Read normalized dashboard aggregates with fresh session/workspace authorization. */
-export async function getFinanceDashboard(currency: FinanceCurrency = "RUB") { return localizeResult(await analytics.getFinanceDashboard(currency)); }
+export async function getFinanceDashboard(currency: FinanceCurrency = "EUR") { return localizeResult(await analytics.getFinanceDashboard(currency)); }
 /** Export an authorized normalized financial overview as exact CSV cells. */
-export async function getFinanceExport(currency: FinanceCurrency = "RUB") { return localizeResult(await analytics.getFinanceExport(currency)); }
+export async function getFinanceExport(currency: FinanceCurrency = "EUR") { return localizeResult(await analytics.getFinanceExport(currency)); }
 /** Read the filtered normalized payment register. */
 export async function getPayments(filters: PaymentFilters = {}) { return localizeResult(await paymentQueries.getPayments(filters)); }
 /** Find authorized issued invoices for recording a payment. */

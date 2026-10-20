@@ -20,8 +20,8 @@ const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Используйт
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }, "Несуществующая дата");
 const dateTimeSchema = z.string().datetime({ offset: true });
-const minorUnitsSchema = z.union([z.string().regex(/^\d{1,20}$/, "Нужны целые копейки, максимум 20 цифр"), z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)]).transform((value) => BigInt(value).toString());
-const currencySchema = z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, "Укажите трёхбуквенный код валюты");
+const minorUnitsSchema = z.union([z.string().regex(/^\d{1,20}$/, "Нужны целые евроценты, максимум 20 цифр"), z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER)]).transform((value) => BigInt(value).toString());
+const currencySchema = z.literal("EUR");
 export const contactTagsSchema = z.array(z.string().trim().min(1, "Тег не должен быть пустым").max(32, "Тег — до 32 символов")).max(20, "Не более 20 тегов")
   .refine((tags) => new Set(tags.map((tag) => tag.toLocaleLowerCase("ru"))).size === tags.length, "Теги не должны повторяться");
 
@@ -42,7 +42,7 @@ export const dealSchema = z.object({
   title: z.string().trim().min(1, "Введите название сделки").max(240),
   contactId: entityIdSchema, ownerId: entityIdSchema.nullable().optional(),
   stage: z.enum(DEAL_STAGES).default("NEW"), value: minorUnitsSchema.default("0"),
-  currency: currencySchema.default("RUB"), expectedCloseDate: dateSchema.nullable().optional(), notes: nullableText(10_000),
+  currency: currencySchema.default("EUR"), expectedCloseDate: dateSchema.nullable().optional(), notes: nullableText(10_000),
 }).strict();
 
 /** An activity must belong to a contact, a deal, or a consistent pair of both. */

@@ -29,7 +29,7 @@ export const definition = {
     },
     {
       "key": "amount",
-      "label": "Сумма, ₽",
+      "label": "Сумма, €",
       "type": "money",
       "required": true
     },

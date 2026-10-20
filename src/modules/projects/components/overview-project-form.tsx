@@ -23,7 +23,7 @@ export function OverviewProjectForm({ project: initial, onSaved, onClose, onRetu
   const { t } = useI18n();
 
   const project = useRef(initial).current, id = useId(), saving = useRef(false), [error, setError] = useState(""), [blocked, setBlocked] = useState(false), [manager, setManager] = useState(project?.manager ?? null);
-  const form = useForm<Values>({ resolver: zodResolver(overviewProjectFormSchema), mode: "onBlur", reValidateMode: "onBlur", defaultValues: { code: project?.code ?? "", name: project?.name ?? "", description: project?.description ?? "", status: project?.status ?? "PLANNING", budget: project ? invoicePriceInput(project.budget) : "0.00", currency: project?.currency === "USD" || project?.currency === "EUR" ? project.currency : "RUB", managerId: project?.managerId ?? "", startDate: project?.startDate ?? "", endDate: project?.endDate ?? "" } });
+  const form = useForm<Values>({ resolver: zodResolver(overviewProjectFormSchema), mode: "onBlur", reValidateMode: "onBlur", defaultValues: { code: project?.code ?? "", name: project?.name ?? "", description: project?.description ?? "", status: project?.status ?? "PLANNING", budget: project ? invoicePriceInput(project.budget) : "0.00", currency: "EUR", managerId: project?.managerId ?? "", startDate: project?.startDate ?? "", endDate: project?.endDate ?? "" } });
   const pending = form.formState.isSubmitting;
   function handleClose() { if (!saving.current && !pending) onClose(blocked); }
   function handleShortcut(event: KeyboardEvent<HTMLFormElement>) { if ((event.ctrlKey || event.metaKey) && event.key === "Enter" && !event.repeat && !event.nativeEvent.isComposing) { event.preventDefault(); if (!saving.current && !blocked) event.currentTarget.requestSubmit(); } }

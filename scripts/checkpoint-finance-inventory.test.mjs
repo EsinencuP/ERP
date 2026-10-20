@@ -53,7 +53,7 @@ test("CHECKPOINT-03: Finance and Inventory", async (t) => {
     const admin = await login("admin"), reader = await login("reader"), agent = await login("agent"), foreign = await login("foreign");
     const call = async (name, ...args) => saved(await action(name, args, admin));
     const contact = await db.contact.create({ data: { workspaceId: workspaceIds[0], name: "Контрольный клиент" } });
-    const invoiceInput = { contactId: contact.id, currency: "RUB", issueDate: day(-10), dueDate: day(10), taxRate: "20", items: [{ description: "Разработка · контроль округления", quantity: "1.500", unitPrice: "10001" }] };
+    const invoiceInput = { contactId: contact.id, currency: "EUR", issueDate: day(-10), dueDate: day(10), taxRate: "20", items: [{ description: "Разработка · контроль округления", quantity: "1.500", unitPrice: "10001" }] };
     let invoice;
     await check("invoice CRUD, authoritative rounding, numbering and optimistic version", async () => {
       invoice = await call("createInvoice", invoiceInput);
@@ -82,23 +82,23 @@ test("CHECKPOINT-03: Finance and Inventory", async (t) => {
       await call("createInvoicePayment", overdue.id, overdue.version, { amount: "2500", reference: `${prefix}-overdue` });
       let sent = await call("createInvoice", { ...simple, dueDate: day(10), items: [{ description: "Будущий платёж", quantity: "1", unitPrice: "20000" }] }); await call("updateInvoiceStatus", sent.id, sent.version, "SENT");
       const cancelled = await call("createInvoice", simple); await call("updateInvoiceStatus", cancelled.id, cancelled.version, "CANCELLED");
-      const report = await call("getFinanceDashboard", "RUB");
+      const report = await call("getFinanceDashboard", "EUR");
       assert.deepEqual(report.kpis, { totalRevenue: "32128", outstanding: "27500", paidMtd: "32128", overdue: "7500", openCount: 2, overdueCount: 1 });
       assert.equal(report.revenue.length, 6); assert.equal(report.revenue.at(-1).amount, "32128"); assert.equal(report.topClients[0].amount, "32128");
       assert.equal(report.statuses.find((row) => row.status === "PAID").count, 1); assert.equal(report.statuses.find((row) => row.status === "OVERDUE").count, 1);
       assert.equal(report.aging.reduce((sum, row) => sum + BigInt(row.amount), 0n), 27500n);
     });
     await check("expense CRUD/category, P&L paid invoices and exact protected CSV", async () => {
-      const input = { title: " Лицензия ERP ", amount: "1000", currency: "RUB", category: "SOFTWARE", date: day(), receipt: "https://example.invalid/receipt", notes: "" };
+      const input = { title: " Лицензия ERP ", amount: "1000", currency: "EUR", category: "SOFTWARE", date: day(), receipt: "https://example.invalid/receipt", notes: "" };
       let expense = await call("createExpense", input); assert.equal(expense.title, "Лицензия ERP");
       expense = await call("updateExpense", expense.id, expense.version, { ...input, amount: "2000" });
       rejected(await action("updateExpense", [expense.id, 1, input], admin), "CONFLICT");
       rejected(await action("createExpense", [{ ...input, receipt: "javascript:alert(1)" }], admin), "VALIDATION");
       const expendable = await call("createExpense", input); await call("deleteExpense", expendable.id, expendable.version);
       assert.equal((await call("getExpenses", { category: "SOFTWARE" })).total, 1);
-      const filters = { from: day(-2), to: day(2), currency: "RUB" }, pnl = await call("getPnlReport", filters);
+      const filters = { from: day(-2), to: day(2), currency: "EUR" }, pnl = await call("getPnlReport", filters);
       assert.equal(pnl.revenue, "29628"); assert.equal(pnl.expenses, "2000"); assert.equal(pnl.netProfit, "27628");
-      const url = `${base}/api/reports/export?type=pnl&from=${filters.from}&to=${filters.to}&currency=RUB`, csv = await fetch(url, { headers: { Cookie: admin } });
+      const url = `${base}/api/reports/export?type=pnl&from=${filters.from}&to=${filters.to}&currency=EUR`, csv = await fetch(url, { headers: { Cookie: admin } });
       assert.equal(csv.status, 200); const bytes = Buffer.from(await csv.arrayBuffer()); assert.equal(bytes.subarray(0, 3).toString("hex"), "efbbbf");
       for (const amount of ["296.28", "20.00", "276.28"]) assert.ok(bytes.toString().includes(amount));
       assert.equal((await fetch(url, { headers: { Cookie: reader } })).status, 403);
@@ -106,7 +106,7 @@ test("CHECKPOINT-03: Finance and Inventory", async (t) => {
     });
     const products = [], warehouseInput = { code: "MAIN", name: "Основной склад", address: "", isActive: true };
     let main, target;
-    const productInput = (index, price, min, currency = "RUB") => ({ sku: `CHECK-${index}`, name: `Товар ${index} · Проверка`, category: "Комплектующие", description: "", unit: "pcs", currency, salePrice: price, minStock: min, isActive: true });
+    const productInput = (index, price, min, currency = "EUR") => ({ sku: `CHECK-${index}`, name: `Товар ${index} · Проверка`, category: "Комплектующие", description: "", unit: "pcs", currency, salePrice: price, minStock: min, isActive: true });
     const move = async (product, type, quantity, extra = {}) => {
       const position = await call("getStockPosition", product.id, main.id);
       return call("createStockMovement", { productId: product.id, warehouseId: main.id, stockVersion: position.version, type, quantity, reference: "CHECKPOINT-03", ...extra });
@@ -125,20 +125,20 @@ test("CHECKPOINT-03: Finance and Inventory", async (t) => {
       const ledger = await call("getProductMovements", p.id, {}); assert.equal(ledger.total, 6);
       assert.equal((await call("getProductMovements", p.id, { type: "TRANSFER" })).total, 2);
     });
-    await check("inventory KPIs, precise multi-currency value, thresholds, inactive warehouse and pagination", async () => {
-      for (const [index, price, min, qty, currency] of [[2, "200", "2", "1", "RUB"], [3, "5000", "0", "0", "RUB"], [4, "333", "1", "0.001", "RUB"], [5, "100", "0", "0.005", "RUB"], [6, "999", "0", "1", "USD"], [7, "1000", "0", "100", "RUB"], [8, "9007199254740993", "0", "2", "EUR"]]) {
+    await check("inventory KPIs, precise EUR value, thresholds, inactive warehouse and pagination", async () => {
+      for (const [index, price, min, qty, currency] of [[2, "200", "2", "1", "EUR"], [3, "5000", "0", "0", "EUR"], [4, "333", "1", "0.001", "EUR"], [5, "100", "0", "0.005", "EUR"], [6, "999", "0", "1", "EUR"], [7, "1000", "0", "100", "EUR"], [8, "9007199254740993", "0", "2", "EUR"]]) {
         const input = productInput(index, price, min, currency), product = await call("createProduct", input); products.push(product);
         if (qty !== "0") await move(product, "IN", qty);
         if (index === 7) await call("updateProduct", product.id, product.version, { ...input, isActive: false });
       }
       target = await call("updateWarehouse", target.id, target.version, { ...warehouseInput, code: "SECOND", name: "Резервный склад", isActive: false });
       const result = await call("getInventoryDashboard", { pageSize: 2 });
-      assert.deepEqual(result.kpis, { totalProducts: 7, lowStockCount: 3, outOfStock: 1, totalValues: [{ currency: "EUR", amount: "18014398509481986" }, { currency: "RUB", amount: "504" }, { currency: "USD", amount: "999" }] });
+      assert.deepEqual(result.kpis, { totalProducts: 7, lowStockCount: 3, outOfStock: 1, totalValues: [{ currency: "EUR", amount: "18014398509483489" }] });
       assert.equal(result.alerts.total, 4); assert.equal(result.alerts.data.length, 2);
       const next = await call("getInventoryDashboard", { page: 2, pageSize: 2 }); assert.ok(next.alerts.data.every((row) => !result.alerts.data.some((first) => first.id === row.id)));
       const filtered = await call("getInventoryDashboard", { search: "Товар 3", stockStatus: "out_of_stock" }); assert.equal(filtered.alerts.total, 1); assert.deepEqual(filtered.kpis, result.kpis);
       await move(products[1], "OUT", "1"); const updated = await call("getInventoryDashboard", {});
-      assert.equal(updated.kpis.lowStockCount, 2); assert.equal(updated.kpis.outOfStock, 2); assert.equal(updated.kpis.totalValues.find((row) => row.currency === "RUB").amount, "304");
+      assert.equal(updated.kpis.lowStockCount, 2); assert.equal(updated.kpis.outOfStock, 2); assert.equal(updated.kpis.totalValues.find((row) => row.currency === "EUR").amount, "18014398509483289");
       assert.deepEqual(await call("getInventoryStockAlert"), { lowStock: 2, outOfStock: 2, total: 4 });
     });
     await check("immutable ledger, audit rollback and transfer database constraints", async () => {

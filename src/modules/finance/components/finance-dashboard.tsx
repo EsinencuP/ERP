@@ -25,7 +25,7 @@ export function FinanceDashboard({ initialData }: { initialData: Result<FinanceD
   const { t, count, locale: uiLocale, localeTag: uiLocaleTag } = useI18n();
 
   const { can } = usePermissions(), [exporting, setExporting] = useState(false);
-  const [data, setData] = useState(initialData), [currency, setCurrency] = useState<FinanceCurrency>(initialData.ok ? initialData.data.currency : "RUB");
+  const [data, setData] = useState(initialData), [currency, setCurrency] = useState<FinanceCurrency>(initialData.ok ? initialData.data.currency : "EUR");
   const [revision, setRevision] = useState(0), [loading, setLoading] = useState(false), first = useRef(true);
   useEffect(() => {
     if (first.current) { first.current = false; return; }

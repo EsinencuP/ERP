@@ -19,7 +19,7 @@ async function readPnlReport(filters: PnlFilters, exporting: boolean): Promise<R
   const context = await getFinanceContext(); if (!context.ok) return context;
   if (exporting && !hasPermission(context.data.role, "canExport")) return err("FORBIDDEN", "Нет права на экспорт финансового отчёта");
   const parsed = pnlFiltersSchema.safeParse(filters);
-  if (!parsed.success) return err("VALIDATION", "Укажите корректный период и валюту RUB, USD или EUR");
+  if (!parsed.success) return err("VALIDATION", "Укажите корректный период и валюту EUR");
   const { from, to, currency } = parsed.data, { workspaceId } = context.data, asOf = new Date();
   try {
     // One statement gives revenue and expenses a common PostgreSQL snapshot. All money stays numeric/BigInt.

@@ -16,7 +16,7 @@ export async function createPayment(input: unknown): Promise<Result<DocumentReco
   const permitted = authorize(session.data, "finance", "update");
   if (!permitted.ok) return permitted;
   const parsed = paymentSchema.safeParse(input);
-  if (!parsed.success) return failure("VALIDATION", "Введите положительную сумму платежа (не более 20 млн ₽)");
+  if (!parsed.success) return failure("VALIDATION", "Введите положительную сумму платежа (не более 20 млн €)");
   const state = await getWorkspaceState(session.data);
   if (!state.ok) return state;
   const invoice = state.data.documents.find((row) => row.id === parsed.data.documentId && row.domain === "finance");

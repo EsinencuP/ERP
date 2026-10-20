@@ -149,6 +149,7 @@ model Workspace {
   leaves           Leave[]
   projects         Project[]
   tasks            Task[]
+  invitations      WorkspaceInvitation[]
 }
 
 model User {
@@ -173,6 +174,8 @@ model Membership {
   workspaceId        String
   role               UserRole        @default(READONLY)
   isActive           Boolean         @default(true)
+  version            Int             @default(1)
+  lastLoginAt        DateTime?       @db.Timestamptz(3)
   createdAt          DateTime        @default(now())
   updatedAt          DateTime        @default(now()) @updatedAt
   user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -190,10 +193,36 @@ model Membership {
   approvedLeaves     Leave[]         @relation("LeaveApprover")
   managedProjects    Project[]       @relation("ProjectManager")
   assignedTasks      Task[]          @relation("TaskAssignee")
+  invitations       WorkspaceInvitation[] @relation("InvitationCreator")
 
   @@id([userId, workspaceId])
   @@index([workspaceId])
   @@index([workspaceId, isActive, role])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+}
+
+model WorkspaceInvitation {
+  id          String @id @default(cuid())
+  workspaceId String
+  createdById String
+  email       String @db.VarChar(200)
+  role        UserRole
+  tokenHash   String @unique @db.Char(64)
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime @db.Timestamptz(3)
+  acceptedAt  DateTime? @db.Timestamptz(3)
+  version     Int @default(1)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  createdBy   Membership @relation("InvitationCreator", fields: [createdById, workspaceId], references: [userId, workspaceId], onDelete: Restrict)
+  @@unique([id, workspaceId])
+  @@index([workspaceId, createdAt, id])
+  @@index([workspaceId, email, status])
 }
 
 model Session {
@@ -235,7 +264,7 @@ model AuditLog {
   @@map("AuditEvent")
 }
 
-// CRM. Money uses exact integer kopecks (Decimal(20,0)), never Float.
+// CRM. Money uses exact integer euro cents (Decimal(20,0)), never Float.
 model Contact {
   id          String       @id @default(cuid())
   workspaceId String
@@ -272,7 +301,7 @@ model Deal {
   ownerId           String?
   stage             DealStage   @default(NEW)
   value             Decimal     @default(0) @db.Decimal(20, 0)
-  currency          String      @default("RUB") @db.Char(3)
+  currency          String      @default("EUR") @db.Char(3)
   expectedCloseDate DateTime?   @db.Date
   closedAt          DateTime?   @db.Timestamptz(3)
   notes             String?
@@ -326,7 +355,7 @@ model Invoice {
   projectId   String?
   createdById String?
   status      InvoiceStatus @default(DRAFT)
-  currency    String        @default("RUB") @db.Char(3)
+  currency    String        @default("EUR") @db.Char(3)
   subtotal    Decimal       @db.Decimal(20, 0)
   taxRate     Decimal       @default(0) @db.Decimal(5, 2)
   total       Decimal       @db.Decimal(20, 0)
@@ -419,7 +448,7 @@ model Expense {
   projectId   String?
   title       String          @db.VarChar(200)
   amount      Decimal         @db.Decimal(20, 0)
-  currency    String          @default("RUB") @db.Char(3)
+  currency    String          @default("EUR") @db.Char(3)
   category    ExpenseCategory  @default(OTHER)
   date        DateTime        @db.Date
   receipt     String?         @db.VarChar(2048)
@@ -447,7 +476,7 @@ model Product {
   category     String?       @db.VarChar(100)
   description  String?
   unit         String        @default("pcs") @db.VarChar(32)
-  currency     String        @default("RUB") @db.Char(3)
+  currency     String        @default("EUR") @db.Char(3)
   costPrice    Decimal       @default(0) @db.Decimal(20, 0)
   salePrice    Decimal       @default(0) @db.Decimal(20, 0)
   minStock     Decimal       @default(0) @db.Decimal(20, 3)
@@ -624,7 +653,7 @@ model Project {
   managerId   String?
   status      ProjectStatus @default(PLANNING)
   budget      Decimal       @default(0) @db.Decimal(20, 0)
-  currency    String        @default("RUB") @db.Char(3)
+  currency    String        @default("EUR") @db.Char(3)
   startDate   DateTime?     @db.Date
   endDate     DateTime?     @db.Date
   version     Int           @default(1)
@@ -689,7 +718,7 @@ model Document {
   @@index([workspaceId, domain, createdAt])
 }
 
-// Retains the old Payment table and integer kopecks without reinterpretation.
+// Retains the old Payment table and integer euro cents without reinterpretation.
 model DocumentPayment {
   id          String    @id @default(cuid())
   documentId  String

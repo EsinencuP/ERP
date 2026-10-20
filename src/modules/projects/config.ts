@@ -29,7 +29,7 @@ export const definition = {
     },
     {
       "key": "amount",
-      "label": "Бюджет, ₽",
+      "label": "Бюджет, €",
       "type": "money"
     },
     {

@@ -167,3 +167,15 @@ Docker и PostgreSQL CLI отсутствуют в доступной среде
 - Invoice PDF en/ru: скачивание, Poppler и визуальный просмотр; P&L CSV: английские/русские заголовки, категории и неизменённые точные числа.
 - Светлая/тёмная тема, reduced motion, 375 px: переполнения нет; в проверенном production UI неожиданных pageerror нет.
 - Снимки и детали: [LOCALIZATION.md](LOCALIZATION.md). Собственные временные записи из локальной PostgreSQL удалены после проверки. Это не CHECKPOINT-04/05 и не реализация TASK-024—030.
+
+
+## TASK-024 + EUR — 2026-10-20
+
+- Production build, tsc --noEmit, prisma validate: PASS. Обе новые миграции применены локально, повторный deploy без pending migrations.
+- 2 workspace / 5 ролей, tenant isolation, self/SUPER_ADMIN guards, role/status changes, session revocation, Unicode search/strict DTO, stale version: PASS.
+- Одноразовые приглашения, отзыв/expiry/reissue, существующий аккаунт/пароль/сохранение профиля: PASS. Browser redemption создаёт аккаунт и входит в нужный workspace; admin routes закрыты для AGENT.
+- Ошибка audit INSERT откатывает изменение; same-version race сохраняет одну мутацию; latest100 и recursive secret stripping: PASS.
+- EUR 1:93: dry-run rollback и реальная локальная миграция 6 invoices/109 items/3 payments; 118 новых conversion audits, subtotal/total/payment инварианты сохранены. Округление единичных цен описано в TASK-024.md.
+- Finance/Inventory regression: 9/9 PASS, fixture currencies обновлены на EUR. PDF en/ru просмотрен через Poppler, CSV EUR 120.00/20.00/100.00 проверен. Explicit demo conversion 30 records + idempotency: PASS.
+- EN/RU 1845 сообщений, совпадающие placeholders, нет отсутствующих статических t keys; нет any/console.log. Browser финального build: 0 pageerror/console warnings, light/dark, reduced motion, 375 px без внешнего overflow, Esc закрывает dialog.
+- Снимки и ограничения: [TASK-024.md](TASK-024.md). TASK-025/CHECKPOINT-04/05 остаются в очереди. Временные workspace и пользователи проверки удалены; исходные данные сохранены.

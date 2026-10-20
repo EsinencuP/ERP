@@ -5,6 +5,6 @@ import { FinanceNavigation } from "@/modules/finance/components/invoice-presenta
 
 /** Load the current calendar month's authorized P&L from normalized PostgreSQL records. */
 export default async function Page() {
-  const filters = { ...getPnlPeriod("month"), currency: "RUB" as const };
+  const filters = { ...getPnlPeriod("month"), currency: "EUR" as const };
   return <><FinanceNavigation section="reports" /><PnlReport initialFilters={filters} initialData={await getPnlReport(filters)} /></>;
 }

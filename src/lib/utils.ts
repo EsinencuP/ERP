@@ -10,7 +10,7 @@ const graphemeSegmenter = new Intl.Segmenter("ru", { granularity: "grapheme" });
 export function cn(...inputs: ClassValue[]): string { return twMerge(clsx(inputs)); }
 
 /** Format integer minor units exactly (including Decimal strings); invalid input returns an em dash. */
-export function formatCurrency(amount: number | bigint | string, currency = "RUB", locale: Locale = DEFAULT_LOCALE): string {
+export function formatCurrency(amount: number | bigint | string, currency = "EUR", locale: Locale = DEFAULT_LOCALE): string {
   if (typeof amount === "number" && !Number.isSafeInteger(amount)) return "—";
   if (typeof amount === "string" && !/^-?\d+$/.test(amount)) return "—";
   if (!/^[a-z]{3}$/i.test(currency)) return "—";
@@ -54,11 +54,11 @@ export function truncate(value: string, maxLength = 80, suffix = "…"): string 
   return characters.slice(0, limit - ending.length).join("") + ending.join("");
 }
 
-/** Format integer minor currency units as rubles in the active language. */
+/** Format integer minor currency units as euros in the active language. */
 export function money(amount: number, compact = false, locale: Locale = DEFAULT_LOCALE): string {
-  if (!compact) return formatCurrency(amount, "RUB", locale);
+  if (!compact) return formatCurrency(amount, "EUR", locale);
   if (!Number.isSafeInteger(amount)) return "—";
-  return new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "RUB", minimumFractionDigits: 0, maximumFractionDigits: 1, notation: "compact" }).format(amount / 100);
+  return new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: "EUR", minimumFractionDigits: 0, maximumFractionDigits: 1, notation: "compact" }).format(amount / 100);
 }
 
 /** Format a persisted ISO date without depending on the machine timezone. */

@@ -8,12 +8,12 @@ export const STOCK_STATUSES = ["in_stock", "low_stock", "out_of_stock"] as const
 export const productIdSchema = z.string().trim().min(1).max(128);
 export const productVersionSchema = z.number().int().positive().max(2_147_483_646);
 export const productQuantitySchema = z.string().regex(/^\d{1,17}(\.\d{1,3})?$/, "Количество: неотрицательное число, до 3 знаков после точки");
-export const PRODUCT_CURRENCIES = ["RUB", "USD", "EUR"] as const;
+export const PRODUCT_CURRENCIES = ["EUR"] as const;
 export const productSchema = z.object({
   sku: z.string().trim().min(1, "Введите SKU").max(64), name: z.string().trim().min(1, "Введите наименование").max(200),
   category: z.string().trim().max(100).default(""), description: z.string().trim().max(10000).default(""),
   unit: z.string().trim().min(1, "Укажите единицу").max(32).default("pcs"),
-  currency: z.enum(PRODUCT_CURRENCIES).default("RUB"), salePrice: z.string().regex(/^\d{1,20}$/, "Цена в целых копейках, до 20 цифр"),
+  currency: z.enum(PRODUCT_CURRENCIES).default("EUR"), salePrice: z.string().regex(/^\d{1,20}$/, "Цена в целых евроцентах, до 20 цифр"),
   minStock: productQuantitySchema.default("0"), isActive: z.boolean().default(true),
 }).strict();
 export const productFormSchema = productSchema.extend({ salePrice: z.string().regex(/^\d{1,18}(\.\d{1,2})?$/, "Цена: неотрицательное число, до 2 знаков после точки") });

@@ -17,8 +17,8 @@ export const fetchCache = "force-no-store";
 export default async function Page({ searchParams }: { searchParams: Promise<{ currency?: string }> }) {
   noStore();
   const session = await getSession(); if (!session.ok) return <ErrorPanel error={session.error} />;
-  const { currency: input = "RUB" } = await searchParams, parsed = financeCurrencySchema.safeParse(input);
-  if (!parsed.success) return <ErrorPanel error={err("VALIDATION", "Выберите валюту RUB, USD или EUR").error} />;
+  const { currency: input = "EUR" } = await searchParams, parsed = financeCurrencySchema.safeParse(input);
+  if (!parsed.success) return <ErrorPanel error={err("VALIDATION", "Выберите валюту EUR").error} />;
   const [finance, deals, stock, pending, activity] = await Promise.all([getFinanceDashboard(parsed.data), getDealDashboard(), getInventoryStockAlert(), getLeavePendingCount(), getDashboardActivity()]);
   return <Dashboard name={session.data.name} currency={parsed.data} now={new Date().toISOString()} data={{ finance, deals, stock, pending, activity }} />;
 }

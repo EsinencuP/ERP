@@ -28,7 +28,7 @@ export function ProductFormSheet({ product: initialProduct, onSaved, onClose, on
 
   const product = useRef(initialProduct).current, id = useId(), saving = useRef(false);
   const [error, setError] = useState(""), [blocked, setBlocked] = useState(false);
-  const form = useForm<FormValues>({ resolver: zodResolver(productFormSchema), mode: "onBlur", reValidateMode: "onBlur", defaultValues: { sku: product?.sku ?? "", name: product?.name ?? "", category: product?.category ?? "", description: product?.description ?? "", unit: product?.unit ?? "pcs", currency: product?.currency === "USD" || product?.currency === "EUR" ? product.currency : "RUB", salePrice: product ? `${BigInt(product.salePrice) / 100n}.${(BigInt(product.salePrice) % 100n).toString().padStart(2, "0")}` : "", minStock: product?.minStock ?? "0", isActive: product?.isActive ?? true } });
+  const form = useForm<FormValues>({ resolver: zodResolver(productFormSchema), mode: "onBlur", reValidateMode: "onBlur", defaultValues: { sku: product?.sku ?? "", name: product?.name ?? "", category: product?.category ?? "", description: product?.description ?? "", unit: product?.unit ?? "pcs", currency: "EUR", salePrice: product ? `${BigInt(product.salePrice) / 100n}.${(BigInt(product.salePrice) % 100n).toString().padStart(2, "0")}` : "", minStock: product?.minStock ?? "0", isActive: product?.isActive ?? true } });
   const pending = form.formState.isSubmitting, locked = pending || blocked;
   async function handleSubmit(input: FormValues) {
     if (saving.current || blocked) return;

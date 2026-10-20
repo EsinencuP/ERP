@@ -23,6 +23,6 @@ export type DocumentRecord = { id: string; workspaceId: string; domain: Domain; 
 export type RecordData = { title: string; subtitle: string; status: string; amount: number; quantity: number; email: string; date: string; progress: number; notes: string };
 export type AuditEvent = { id: string; workspaceId: string; actor: string; domain: Domain; action: "created" | "updated" | "deleted" | "payment"; entityType?: string | null; title: string; createdAt: string };
 export type Payment = { id: string; documentId: string; workspaceId: string; amount: number; createdAt: string; reference: string };
-export type WorkspaceState = { documents: DocumentRecord[]; events: AuditEvent[]; payments: Payment[] };
+export type WorkspaceState = { baseCurrency?: "EUR"; documents: DocumentRecord[]; events: AuditEvent[]; payments: Payment[] };
 export type FieldDefinition = { key: keyof RecordData; label: string; type: "text" | "email" | "money" | "number" | "date" | "textarea" | "select"; required?: boolean; options?: readonly string[] };
 export type DomainDefinition = { title: string; singular: string; description: string; primaryLabel: string; secondaryLabel: string; amountLabel: string; statuses: readonly string[]; fields: readonly FieldDefinition[]; board: boolean };

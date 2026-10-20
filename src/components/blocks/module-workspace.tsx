@@ -89,7 +89,7 @@ export function ModuleWorkspace({ domain, initialState, session }: { domain: Dom
     const exported = await getExportDocuments(domain, requestedRows.map((row) => row.id));
     if (!exported.ok) { setError(exported.error.message); return; }
     const exportRows = exported.data;
-    const result = downloadCsv(`evo-${domain}.csv`, [[t(definition.primaryLabel), t(definition.secondaryLabel), t("Статус"), `${t(definition.amountLabel)}, ₽`, t("Количество"), t("Email"), t("Дата"), t("Готовность, %"), t("Комментарий")], ...exportRows.map((row) => [row.data.title, row.data.subtitle, t(row.data.status), row.data.amount / 100, row.data.quantity, row.data.email, row.data.date, row.data.progress, row.data.notes])]);
+    const result = downloadCsv(`evo-${domain}.csv`, [[t(definition.primaryLabel), t(definition.secondaryLabel), t("Статус"), `${t(definition.amountLabel)}, €`, t("Количество"), t("Email"), t("Дата"), t("Готовность, %"), t("Комментарий")], ...exportRows.map((row) => [row.data.title, row.data.subtitle, t(row.data.status), row.data.amount / 100, row.data.quantity, row.data.email, row.data.date, row.data.progress, row.data.notes])]);
     if (!result.ok) setError(result.error.message); else setMessage(t`Экспортировано записей: ${exportRows.length}`);
     } catch { setError(t("Не удалось получить данные для экспорта. Повторите попытку")); }
   }

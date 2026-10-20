@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   if (Array.from(params.keys()).some((key) => params.getAll(key).length !== 1)) return handleError(err("VALIDATION", "Параметры отчёта не должны повторяться"));
   const parsed = pnlExportSchema.safeParse(Object.fromEntries(params));
-  if (!parsed.success) return handleError(err("VALIDATION", "Укажите type=pnl, даты from/to и валюту RUB, USD или EUR"));
+  if (!parsed.success) return handleError(err("VALIDATION", "Укажите type=pnl, даты from/to и валюту EUR"));
   const { from, to, currency } = parsed.data, result = await getPnlExport({ from, to, currency });
   if (!result.ok) return handleError(result);
   return new NextResponse(serializeCsv(result.data), { headers: { ...privateHeaders, "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="evo-pnl-${currency}-${from}-${to}.csv"` } });
