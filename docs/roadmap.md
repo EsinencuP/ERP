@@ -54,7 +54,7 @@
 
 **TASK-023 — Main Dashboard KPIs + Charts + Activity: ЗАКРЫТ.** Четыре межмодульных KPI, два графика, пять счетов, audit feed и low-stock banner; server Promise.all/no-store: [TASK-023.md](TASK-023.md).
 
-Другие задания пользователя пока не закрывались. Нумерация остальных пунктов ниже — предварительная очередь развития ранее созданного каркаса, а не подтверждённое завершение будущих пользовательских задач.
+Актуальный статус TASK-024—030 и CHECKPOINT-04/05 приведён в разделе «Новая очередь пользователя — текущий статус» ниже. Промежуточные пункты следующего раздела сохраняют историю исходного каркаса и его дальнейшего развития.
 
 ## Текущий этап — запускаемый ERP Template
 
@@ -108,15 +108,16 @@
 - CHECKPOINT-002: доменные интеграционные проверки, нагрузка и восстановление из backup.
 
 
-## Новая очередь пользователя — ещё не реализовано
+## Новая очередь пользователя — текущий статус
 
 - TASK-024: **реализовано** — `/settings/users`, `/settings/audit`, email/role invitation links, роли ADMIN+, деактивация/восстановление, last login, последние 100 tenant audit событий. Отчёт: [TASK-024.md](TASK-024.md).
 - TASK-025: **реализовано** — tenant Settings singleton, компания/PNG logo/EUR/timezone/date format, глобальный Context, работающие notification toggles. [Отчёт](TASK-025.md).
 - CHECKPOINT-04: **пройден** — TASK-018—025, production build/tsc, HR/leave/Projects/Dashboard/Settings/RBAC/audit, 9/9 проверок нового checkpoint; регрессии CRM и Finance/Inventory также 9/9 каждая. [Отчёт](CHECKPOINT-04.md).
 - TASK-026: **реализовано** — loading всех UI-страниц, error границы, empty states, mobile Sheet, cmdk/Cmd+K, контекстный Cmd+N, entrance/reduced motion. Build/tsc и браузерная проверка на PostgreSQL: PASS. [Отчёт](TASK-026.md).
 - TASK-027: **реализовано** — Faker sample seed, безопасный bootstrap/no-op rerun, Docker app + PostgreSQL 16 + migration/seed jobs; build/tsc/validate, Docker up, вход и PDF проверены. [Отчёт](TASK-027.md).
-- TASK-028: финальные ADR-001—010, зависимости, RBAC и guide нового модуля.
-- TASK-029: итоговый журнал CONTRA-NNN.
-- TASK-030: Developer Guide, CHECKPOINT-05, релиз/PR/merge/tag v1.0.0 только после прохождения финального checkpoint. Текущий commit/push не означает завершение релиза.
+- TASK-028: **реализовано** — финальная [architecture.md](architecture.md): ADR-001—010, проверенные зависимости модулей, матрицы RBAC, доменные инварианты и процедура нового модуля. Документация сверена с исходниками; build/tsc и проверки ссылок прошли. Релиз и CHECKPOINT-05 — отдельный этап.
+- TASK-029: **реализовано** — [contradictions.md](contradictions.md): записи CONTRA-001—009 в требуемом формате, источники решений и процедура регистрации/разрешения новых конфликтов. Открытых подтверждённых конфликтов не выявлено.
+- TASK-030: **реализовано** — полный [Developer Guide](../INSTRUCTIONS.md), MIT LICENSE, README и согласованная документация; код шаблона нового модуля проверен отдельно. [Отчёт](TASK-030.md).
+- CHECKPOINT-05: **техническая приёмка пройдена** — build/tsc/Prisma/seed/Docker, TASK-024 RBAC, PDF/CSV, EN/RU/themes/mobile/commands/animations. [Доказательства](CHECKPOINT-05.md). Git-публикация dev → main и v1.0.0 выполняется после этих проверок; её результат подтверждается GitHub.
 
 **Локализация EN/RU:** английский по умолчанию, русский через Settings, общие каталоги/форматтеры, ошибки, PDF и CSV. Отчёт: [LOCALIZATION.md](LOCALIZATION.md).

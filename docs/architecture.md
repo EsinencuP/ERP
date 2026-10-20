@@ -1,385 +1,310 @@
 # Архитектура Evo ERP
 
-## Main Dashboard — TASK-023
+Финальная архитектурная редакция TASK-028, актуализирована в TASK-030, 20.10.2026. Документ описывает реализацию после TASK-027; статусы приёмки — в [roadmap](roadmap.md) и [verification](verification.md), финальные доказательства — в [CHECKPOINT-05](CHECKPOINT-05.md). Публикация Git подтверждается отдельно от технической приёмки. При изменении кода обновлять соответствующий ADR и документацию модуля. Обязательные правила — [INSTRUCTIONS.md](../INSTRUCTIONS.md), история решений по задачам — `docs/TASK-*.md`, референсы — [references.md](references.md).
 
-`/` — Server Component с force-dynamic, force-no-store и noStore для прямых Prisma reads. После live session/валидации currency пять независимых источников запускаются одним Promise.all: Finance aggregates, CRM stage counts, общий Inventory alert, HR pending approver count, последние восемь AuditEvent summaries. Legacy WorkspaceState/Documents не участвуют в KPI. Revenue — cash receipts с налогом за всё время в выбранной RUB/USD/EUR, 6 месяцев включая текущий/UTC; Open Deals исключает WON/LOST, bar chart показывает количество всех шести этапов без суммирования валют. Inventory KPI включает active low+zero stock из shared CTE; баннер появляется именно при low_stock > 0. HR pending сохраняет manager/admin policy; остальным показана недоступность, а не нулевой счётчик. Audit ограничен workspace, без before/after, с устойчивой сортировкой date/id и безопасными entity links. Ошибка источника видима и не превращается в ноль; ошибка auth скрывает весь dashboard.
+## 1. Архитектурная модель
 
-Разметка server-rendered, client islands — Recharts и refresh/currency controls. Во время перехода прошлый snapshot скрыт skeleton; новый server snapshot загружается обычным GET. Money остаётся Decimal→string/BigInt, график использует общий bounded projection. Shared RevenueChart и RecentInvoices повторно используются Finance; прежняя полная аналитика TASK-012 сохранена на `/finance/dashboard` с nav. Новых моделей/миграций/зависимостей нет.
+Evo ERP — модульный монолит Next.js App Router с одной PostgreSQL. Server Components получают начальные данные; клиентские компоненты отвечают за формы, таблицы, DnD и графики. Бизнес-операции выполняются на сервере через Server Actions и доменные сервисы. Route Handlers нужны для Auth.js, health, CSV и PDF, а не как второй полный CRUD API.
 
+```mermaid
+flowchart TD
+  Pages[App Router: Server Components] --> Queries[Domain queries / access]
+  Pages --> UI[Client components]
+  UI --> Actions[Server Actions]
+  Actions --> Services[Domain services]
+  Actions --> Queries
+  Queries --> Auth[Live session / permissions]
+  Services --> Auth
+  Queries --> Prisma[Prisma singleton]
+  Services --> TX[Transaction: data + version + audit]
+  TX --> Prisma
+  Prisma --> PG[(PostgreSQL)]
+  HTTP[Route Handlers: auth / health / export / PDF] --> Queries
+  HTTP --> Services
+```
 
-## Projects Overview — TASK-022
+Серверные `access`, `queries` и `service` отделены от клиентских модулей через `server-only`. UI не импортирует Prisma, секреты или серверную сессию. Server Actions принимают DTO без доверенных `workspaceId`/role; tenant и права определяются заново на сервере.
 
-`/projects/overview` читает страницу из 12 нормализованных проектов и выводит progress (DONE / все Task, включая CANCELLED), бюджет/расходы, distinct team и CSS Grid timeline тех же проектов. Карточки/count/task aggregates/expense aggregates/team preview читаются в одном RepeatableRead snapshot. Search/status/projectId tenant-scoped, literal/Cyrillic search shared sqlTextMatch; страницы clamp. Team = manager UNION task assignees, ID distinct; manager первым, inactive assignments отмечены и сохранены. Preview ≤6, full team pagination по 20, без unbounded user/task arrays.
+### Границы модулей
 
-Budget usage = SUM(Expense.amount) с projectId и той же currency, за всё время. Другие валюты показаны отдельно без FX. Invoice revenue не считается расходом. Суммы Decimal→string/BigInt, только bounded bar % преобразуется в Number. Нулевой бюджет не даёт NaN/Infinity; overspend отображается явно, fill ограничен 100%, текстовый % остаётся точным. Additive migration `20261019000600_project_expenses` добавляет nullable Expense.projectId, composite tenant FK RESTRICT и индекс workspace/project/currency; прежние расходы остаются без проекта. Expense CRUD/picker и filtered deep link позволяют назначить проект, пересчёт derived без ручного spent. Старый update Expense без projectId сохраняет назначение; explicit empty снимает связь.
+| Модуль | Основные модели | Маршруты и ответственность |
+| --- | --- | --- |
+| CRM | Contact, Deal, Activity | `/crm/contacts`, `/crm/contacts/[id]`, `/crm/pipeline`: контакты, этапы сделок, активности |
+| Finance | Invoice, InvoiceSequence, InvoiceItem, Payment, Expense | `/finance`, `/finance/dashboard`, `/finance/payments`, `/finance/expenses`, `/finance/reports`: счета/PDF, поступления, расходы, аналитика |
+| Inventory | Product, Warehouse, StockItem, StockMovement | `/inventory`, `/inventory/warehouses`, `/inventory/dashboard`, карточка товара: каталог, остатки и ledger |
+| HR | Employee, EmployeeDocumentLink, LeaveAllowance, Leave | `/hr`, `/hr/org-chart`, `/hr/leaves`, профиль сотрудника: каталог, подчинённость, отпуска |
+| Projects | Project, Task | `/projects`, `/projects/overview`: задачи Kanban/List, прогресс, бюджет, команда, timeline |
+| Settings | Settings, Membership, WorkspaceInvitation; чтение AuditLog | `/settings`, `/settings/users`, `/settings/audit`, `/invite/[token]`: конфигурация и доступ |
+| Dashboard | Собственных бизнес-моделей нет | `/`: композиция KPI и summaries существующих модулей |
+| Shared kernel | Workspace, User, Session, AuditLog; общие контракты | `src/lib`, `src/types`, `src/hooks`, `src/components/ui`, `src/i18n` |
 
-Настройки проекта (code/name/description/status/budget/currency/manager/startDate/endDate) используют shared Projects mutation helper, RBAC, strict Zod, captured version и atomic audit. Связи contact/task и данные legacy не меняются. Новый manager должен быть active workspace member, прежний inactive сохраняется при других правках. Бюджет не переименовывает валюту связанных расходов: они остаются отдельными валютными суммами. Project status ручной, progress всегда derived из реальных задач.
+Сохраняется переходный DocType-слой `Document`/`DocumentPayment`: `document-service → repository`, metadata registry и явный demo-store. Например, `/crm` ещё использует прежнюю таблицу документов, тогда как контакты и pipeline нормализованы. Этот слой не является универсальным хранилищем новых модулей; его значения и результаты нельзя смешивать с нормализованными KPI. См. [database.md](modules/database.md) и [lib/document-service.ts](../src/lib/document-service.ts).
 
-Timeline строится CSS Grid без Gantt-библиотеки: 1…93 календарных дня, default 6 недель относительно Москвы; UTC day arithmetic без DST drift. Явные Project.startDate/endDate, inclusive single-day bars, clipping по периоду и отдельный текст для незаданных/внешних дат. Частичные периоды не выдумываются. Один и тот же выбранный период сохраняется при фильтрах/страницах/refresh. Internal horizontal scroll и sticky project labels; task progress fill не меняет даты проекта. Deep links связывают overview → tasks/expenses и обратно; ошибки PostgreSQL скрывают прежние карточки/timeline без demo fallback.
+### Граф зависимостей модулей
 
+Стрелка ниже означает фактический импорт `@/modules/...`, включая клиентские форматтеры и DTO. Это не граф внешних сервисов или только связей БД.
 
-## Projects Task Kanban + List — TASK-021
+```mermaid
+flowchart LR
+  Finance -->|contact picker| CRM
+  Finance -->|expense project picker| Projects
+  Projects -->|money schema / calculations| Finance
+  Dashboard -->|presentation / chart / types| Finance
+  Dashboard -->|types| CRM
+  Dashboard -->|stock presentation| Inventory
+  CRM --> Settings
+  Finance --> Settings
+  Inventory --> Settings
+  HR --> Settings
+  Projects --> Settings
+  Dashboard --> Settings
+```
 
-`/projects` читает нормализованные Task/Project; прежний Document-реестр сохранён в `/projects/documents` с прежними legacy actions. Четыре колонки TODO/IN_PROGRESS/IN_REVIEW/DONE, priority badge, workspace-member avatar и due date. Прежний Document count badge показывается только на вкладке реестра. SQL migration переименовывает TaskStatus.REVIEW в IN_REVIEW на месте, без переписывания задач. Существующий CANCELLED сохранён только для чтения истории в List. DONE заполняет completedAt, reopening очищает его.
+Settings предоставляет отдельно серверные configuration queries и клиентский ConfigurationProvider. Finance ↔ Projects — существующая взаимная зависимость вспомогательных схем/форм, не вызов двух мутаций по кругу. При развитии её следует уменьшать выделением общих money-контрактов в shared kernel; такое выделение ещё не выполнено. Общий DnD-hook уже находится в `src/hooks`, Projects не импортирует CRM Kanban-компонент.
 
-ЗАКОН 6: CRM collision detection/keyboard navigation и Pointer/Keyboard sensors вынесены в `src/hooks/use-kanban-dnd.ts`. CRM pipeline сохраняет экспортируемые adapters, Projects использует тот же factory/hook: drop только в колонки, отмена вне board, стрелки через пустую колонку. DragOverlay визуальный, отдельный handle и select-alternative. Перенос меняет статус, ручное ранжирование внутри колонок не добавляется; порядок updatedAt desc/id asc. Position и task hierarchy сохраняются.
+Композиция главной страницы — отдельный уровень:
 
-List использует CRM-паттерн TanStack v8: getRowId, manualPagination/manualSorting и серверный whitelist sort. Оба вида читаются в одном RepeatableRead snapshot (четыре bounded column pages + list page, по 20). Поиск literal/Cyrillic через shared sqlTextMatch; общие project/assignee/priority/search, status только для List. Страницы clamp по server count. Никаких unbounded task lists. Project/member picker — общий RecordPicker с поиском/пагинацией; inactive user/member не назначается, старое назначение сохраняется при редактировании других полей.
+```mermaid
+flowchart LR
+  Root[Root page: Promise.all] --> F[Finance aggregates]
+  Root --> C[CRM deal aggregates]
+  Root --> I[Inventory alerts]
+  Root --> H[HR pending count]
+  Root --> D[Dashboard audit summaries]
+```
 
-Task CRUD и minimal project create используют live session/workspace и shared Projects RBAC: READONLY читает, AGENT+ создают/меняют, MANAGER+ удаляют leaf task. Serializable transaction, expected version и audit атомарны, retry только гарантированного P2034 rollback. Project ownership/parent не меняются через task form, delete с children запрещён. Due date хранится до конца выбранного дня Москвы; unchanged date сохраняет исходный timestamp. Неизвестный результат DnD откатывает отображение с явной ошибкой и блокирует повтор до refresh; committed status не откатывается при ошибке последующего чтения. Failed refresh скрывает старые данные, demo fallback отсутствует.
+Связи данных не равны импортам: Invoice требует Contact и может ссылаться на Deal/Project; InvoiceItem — на Product; Expense — на Project; Project — на Contact и Membership руководителя; Task — на Project и Membership исполнителя; Employee — на Membership и другого Employee. Все межмодульные ссылки проверяются в текущем workspace. Источник — [schema.prisma](../prisma/schema.prisma).
 
+## 2. Architecture Decision Records
 
-## HR Employee Profile — TASK-020
+Все десять ADR приняты; дата этой редакции — 20.10.2026. Раздел «Альтернативы» объясняет выбор, не утверждая, что альтернативная реализация была построена или измерена.
 
-`/hr/[id]`: header с Avatar/Name/Position/Status; слева данные Employee, контакты и named document links, справа годовой leave balance и Reporting to. Имена в Grid/List/Org Chart и руководитель ведут в профиль. Профиль редактируется общей EmployeeFormSheet; документы — отдельные versioned EmployeeDocumentLink с title/url/notes. URL только http(s), без credentials, при рендере повторная валидация; файл не загружается и сервер не запрашивает URL.
+### ADR-001 — Стек
 
-Новая LeaveAllowance хранит ручной целый лимит 0…9999 рабочих дней на Employee/year, без неявного default. Нет записи → «Не задан», 0 — явный нулевой лимит. Назначают MANAGER/ADMIN/SUPER_ADMIN; version=0 допустима только при отсутствии записи. Остаток = лимит − APPROVED ANNUAL weekdays в выбранном календарном году, включая будущие дни; PENDING отдельно. SQL клипует переходящий отпуск границами года и исключает выходные. Другие типы/статусы не входят; отрицательный остаток сохраняется. Праздники, half-days, автоматические начисления и carryover не моделируются; лимит не блокирует workflow согласования.
+**Контекст.** Нужен ERP с серверными правами, интерактивными рабочими таблицами и единой TypeScript-моделью.
 
-Профиль проверяет live session/tenant, независимые документы/count/manager/balance читает Promise.all; баланс и лимит одним SQL statement, документы по 10 на странице. Весь профиль не является единым snapshot. Documents/allowance mutations используют существующий HR RBAC, strict Zod, version, Serializable и atomic audit. Document delete только ADMIN/SUPER_ADMIN. Новые tenant composite FK и CHECK в additive migration `20261019000400_employee_profile`. Employee с документами/лимитами удалять нельзя. PostgreSQL error скрывает прежние данные и не включает demo fallback.
+**Решение.** Next.js 15 / React 19 / TypeScript 5, PostgreSQL и Prisma 6; Tailwind 3, Shadcn/Radix primitives; RHF + Zod; NextAuth v5; next-intl; TanStack Table; DnD Kit; Recharts; `@react-pdf/renderer`. Версии зафиксированы [package-lock.json](../package-lock.json), а не диапазонами из внешних примеров. На дату редакции: Next 15.5.28, React 19.1.0, Prisma 6.19.3, NextAuth 5.0.0-beta.32. Контейнер — Node 24 Debian slim, PostgreSQL 16 Alpine. Faker используется только явным seed, не runtime fallback.
 
-## HR Leave Management — TASK-019
+**Альтернативы.** Отдельный SPA/API увеличил бы число контрактов и развёртываний; внешний ERP framework определял бы модель и UI вместо модульного шаблона.
 
-`/hr/leaves` читает нормализованный Leave с пагинацией/search/status/type, по умолчанию очередь PENDING. Create принимает employee/type/startDate/endDate/reason; дни вычисляются сервером и тем же shared date-fns helper в форме. Период включительный, исключаются суббота/воскресенье. DATE хранится как календарная дата UTC midnight, date-fns получает date-only parseISO для календарного расчёта. Нулевые периоды, неверные/обратные даты и >9999 рабочих дней отклоняются.
+**Последствия.** Один deploy и репозиторий, клиентские islands для интерактивности. TypeScript включает strict/noUncheckedIndexedAccess/exactOptionalPropertyTypes, `any` запрещён. Изменения major-версий требуют отдельной проверки; Auth.js beta не считать стабильной v5. См. [package.json](../package.json), [Dockerfile](../Dockerfile), [docker-compose.yml](../docker-compose.yml).
 
-MANAGER/ADMIN/SUPER_ADMIN рассматривают весь workspace; организационная manager self-relation не задаёт отдельный ACL. AGENT+ создают заявки, READONLY читает. PENDING → APPROVED/REJECTED проверяет live роль, id/workspace, version и статус; автор решения сохраняется в approvedById для обоих исходов. Терминальные заявки не редактируются/удаляются. Serializable create/decision и audit атомарны, пересекающиеся PENDING/APPROVED заявки одного сотрудника запрещены; только P2034 допускает retry. Неактивным Employee не создают/одобряют отпуск, pending можно отклонить. Employee.status не меняется автоматически от будущего отпуска.
+### ADR-002 — Модульная структура
 
-Layout параллельно читает state, stock alert и manager-only pending leave count. HR badge показывает полный PENDING count, 99+ визуально, ошибку как !; для AGENT/READONLY/demo скрыт. Актуализируется после committed leave changes, focus окна, переходов и Refresh, без polling. Ошибки не заменяются demo/нулями. Новых моделей/миграций/зависимостей нет: Leave и date-fns уже присутствуют.
+**Контекст.** Домены имеют разные workflow, но общие tenant, права, UI и аудит.
 
-## HR Employee Directory + Org Chart — TASK-018
+**Решение.** Базовый модуль: `src/modules/<domain>/{types,schema,actions,queries,service}.ts` и `components/`. Дополнительные `access`, `serializers`, `*-service`, `*-schema`, `presentation` допустимы для отдельных сценариев. Чтения и мутации разделены; доменные сервисы работают с Prisma напрямую. Shared — только повторно используемые контракты, primitives и hooks, а не копии доменной логики.
 
-`/hr` читает нормализованный Employee, Grid/List используют одну paginated выборку с server-side search/department/status. `/hr/org-chart` читает полный tenant-scoped набор до 2000 узлов и строит рекурсивные сворачиваемые ветки через managerId self-relation. Лимит явный: больший набор возвращает ошибку, а не неполную структуру. Циклы/отсутствующие родители проверяются до рендера. Все статусы сохранены в иерархии. Avatar использует shared initials fallback; новых полей/миграций нет.
+**Альтернативы.** Глобальные каталоги всех services/components затрудняют владение; универсальный DocType CRUD недостаточен для ledger, invoice workflow и отпусков.
 
-Employee profile CRUD проверяет live session/workspace, strict Zod, version и HR RBAC; Serializable transaction атомарно пишет профиль и audit. Рекурсивный SQL с UNION проверяет всю цепочку руководителей в workspace и отклоняет self/descendant/cyclic manager. P2034 повторяется только после гарантированного rollback. Employee с reports, Leave, документами или годовым лимитом не удаляется; MANAGER по действующей политике HR не может удалять. User/login не создаётся и userId не редактируется. DTO не содержит auth/payroll данных. Прежние Document-данные и действия сохранены в `/hr/documents`; автоматического переноса нет.
+**Последствия.** Модули могут иметь явные зависимости, указанные выше; микросервисы, очереди и универсальный event bus не введены. Settings/Dashboard являются модулями приложения, хотя тип `Domain` исторически содержит только пять бизнес-доменов. Источники: [src/modules](../src/modules), [shared.ts](../src/types/shared.ts), [lib/modules.ts](../src/lib/modules.ts).
 
-## Inventory Stock Movements + Warehouses — TASK-016
+### ADR-003 — Result<T>
 
-`/inventory/warehouses` управляет нормализованными складами (code/name/address/isActive) с live Inventory RBAC, version, atomic audit и bounded search/pagination. Product name ведёт на `/inventory/[id]`: totals, paginated warehouse positions и immutable Date/Type/Qty/Reference ledger. Чтения summary/positions/ledger выполняются Promise.all; каждый запрос проверяет tenant, включая отсутствие/чужой id. Missing StockItem читается как qty=0/version=0 без записи в БД.
+**Контекст.** UI должен различать ошибки валидации, прав, конкурентного изменения и PostgreSQL без анализа исключений и строк.
 
-createStockMovement — единственная операция записи журнала: IN/OUT принимают положительное количество, ADJUSTMENT — ненулевую signed delta, TRANSFER — положительное количество, два разных активных склада и expected StockItem versions обеих сторон. Product/warehouses повторно проверяются внутри Serializable transaction. Количества считаются BigInt-тысячными; все конечные балансы проверяются на ≥0 и Decimal(20,3) capacity до записи. Обновления StockItem идут в стабильном порядке warehouse id; новый row создаётся только при expected version=0. Movement(s), balance increments и audit атомарны. Только гарантированный P2034 rollback допускает retry; unknown network result блокирует повтор до чтения журнала.
-
-TRANSFER представлен двумя существующими enum-значениями TRANSFER_OUT/TRANSFER_IN с общим UUID transferId/createdAt и равными противоположными quantity. Общий запас Product сохраняется. Migration `20261019000300_immutable_stock_ledger` запрещает UPDATE/DELETE StockMovement на уровне PostgreSQL и добавляет deferred constraint trigger, проверяющий ровно две строки, один Product, два Warehouse, оба направления и нулевую сумму к commit. Новые модели/enums не нужны. Исправления делаются новыми движениями; update/delete actions и controls журнала отсутствуют.
-
-READONLY читает, AGENT+ создаёт движения и warehouses, MANAGER+ удаляет только неиспользованный склад. Любой StockItem блокирует Warehouse delete, включая нулевой, чтобы сохранить ссылки/ledger; isActive сохраняет данные. Движения неактивных Product/Warehouse запрещены, прежние остатки продолжают входить в totals. UI предлагает поиск активных складов (до 100 результатов), читает balance versions при выборе и показывает обе стороны переноса. Stock catalog/ledger/sidebar обновляются после операции.
-
-## Inventory Products + Stock Levels — TASK-015
-
-`/inventory` использует нормализованные Product/StockItem; прежний Document-каталог сохранён в `/inventory/documents` через явно названные legacy actions. Product получает nullable category (VARCHAR(100)) и tenant/category index; additive migration не изменяет прежние поля/остатки. Stock(total) = SUM(StockItem.qty) по всем складам данного workspace, включая неактивные склады. Товар без StockItem имеет 0. in_stock: qty > minStock; low_stock: 0 < qty ≤ minStock; out_of_stock: qty = 0. Статус вычисляется из точного numeric/BigInt, не хранится в Product.
-
-Inventory queries ограничены live workspace. Страница/количество выполняются Promise.all, одинаковые SQL CTE определяют остаток/статус для поиска по SKU/name/category, category equality, stock status и active filters. Ограниченная серверная пагинация, стабильный порядок SKU/id. DTO передаёт Decimal-цены целыми копейками и количества с тремя знаками строками; форматирование сохраняет точность выше Number.MAX_SAFE_INTEGER.
-
-Catalog CRUD проверяет live Inventory RBAC, strict Zod и version, сохраняет audit атомарно в Serializable-транзакции; повторяет только P2034 с гарантированным rollback. Уникальность SKU — на workspace. Доступны name/category/description/unit/salePrice/currency/minStock/isActive; costPrice и StockItem не меняются. Наличие любого StockItem или InvoiceItem блокирует удаление, вместо этого можно деактивировать товар. Non-modal Sheet/RHF/Zod onBlur, Cmd/Ctrl+Enter/Escape, возврат фокуса и блокировка повтора после неизвестного сетевого результата/конфликта следуют Finance forms.
-
-Dashboard layout параллельно читает legacy workspace state и нормализованный InventoryStockAlert. Sidebar badge = число активных товаров с qty ≤ minStock, включая нулевые и товары без StockItem; inactive Product исключены. Desktop/collapsed/mobile используют один count и доступный текст low/out breakdown; badge визуально ограничен 99+. После CRUD/refresh обновляется layout; при смене маршрута и focus окна badge перечитывается без polling. Ошибка счётчика отображается как «!», а не 0; PostgreSQL error не подменяется демоданными. Явный demo не запрашивает normalized badge. Движения и управление складами реализованы TASK-016 (раздел выше).
-
-## Finance P&L Reports — TASK-014
-
-`/finance/reports` читает нормализованные Invoice/Payment/Expense через finance/reports.ts. Revenue — полные totals с налогом по полностью оплаченным счетам, дата признания — последний receivedAt, доведший счёт до полной оплаты. Статус оплаты вычисляется из суммы платежей до asOf; DRAFT/CANCELLED и частичные оплаты исключены. Expenses — суммы по Expense.date. Net Profit = Revenue − Expenses, включая отрицательный результат. Валюты RUB/USD/EUR выбираются отдельно. Это пользовательская paid-invoice модель отчёта, отличающаяся от cash-receipt dashboard TASK-012 и бухгалтерского accrual ledger.
-
-Один параметризованный SQL statement с CTE payments и UNION ALL revenue/category expenses даёт общий snapshot PostgreSQL без передачи полного реестра в браузер. Decimal суммы сериализуются строками; сложение/вычитание в BigInt. Period presets This Month/Quarter/Year — полные текущие календарные периоды Europe/Moscow; Custom задаёт inclusive from/to. Платежи переводятся в московскую календарную дату, Expense.DATE не смещается. В UI применённый период отделён от draft фильтров, экспорт блокируется до их применения.
-
-`/api/reports/export?type=pnl&from=YYYY-MM-DD&to=YYYY-MM-DD&currency=RUB` повторно проверяет live session/workspace/canExport, строгий whitelist и отсутствие duplicate query keys, пересчитывает тот же report и возвращает attachment UTF-8 CSV (BOM, semicolon, escaping/formula protection). Ошибки — Result JSON с 400/401/403/503; private no-store/nosniff на всех ответах. Currency по умолчанию RUB. Общая serializeCsv переиспользуется клиентским downloadCsv. Новых моделей/миграций нет; тестовые файлы остаются задачей CHECKPOINT-03 после TASK-017.
-
-## Finance Expenses — TASK-013
-
-Новая Expense/ExpenseCategory на `/finance/expenses` хранит title, Decimal(20,0) amount в копейках, currency, category, DATE date, optional receipt/notes и служебные workspace/creator/version/timestamps. Составной FK creator → Membership не допускает автора из другого workspace. Additive migration создаёт только enum/таблицу/индексы; SQL CHECK защищают положительную сумму/версию, непустой title, RUB/USD/EUR, диапазон дат и http(s) receipt. Prisma schema не заменяет эти миграционные CHECK.
-
-Expense queries/services/actions находятся в finance. Page/count запускаются Promise.all с одним фильтром workspace/category/currency/search; порядок date desc/createdAt desc/id asc. Все записи заново проверяют live session/RBAC и version, сохраняют before/after audit в одной Serializable-транзакции. Общий withFinanceMutation вынесен из Invoice service без изменения его retry-политики: только P2034 с гарантированным rollback, не неизвестный сетевой результат.
-
-Форма non-modal Sheet/RHF/Zod onBlur, Ctrl/Cmd+Enter/Escape, фиксация исходной version, Sonner и блокировка повтора при неизвестном результате. Read-only detail показывает полный notes и чек. Receipt — нормализованная внешняя http(s) ссылка без credentials: сервер ничего не скачивает; перед рендером href ссылка повторно проверяется, открывается по клику с noopener/noreferrer. Файловая загрузка не вводится. Дата расхода — календарный DATE без смещения; новая форма подставляет текущий день Europe/Moscow. Expenses не изменяют cash-receipt Revenue/Paid MTD и не являются Invoice Payment.
-
-## Finance Payments + Dashboard KPIs — TASK-012
-
-Главный dashboard читает финансовые данные только из нормализованных Invoice/Payment. После session `Promise.all` запускает operational state и finance aggregates; внутри getFinanceDashboard ещё один `Promise.all` параллельно выполняет четыре параметризованных SQL-запроса через pool: invoice status/AR buckets, receipts/months, top clients, recent invoices. Все запросы ограничены серверным workspace/currency и получают общий asOf. Это параллельные чтения, а не исторический ledger или единая транзакционная snapshot всех графиков; refresh перечитывает весь набор. Мутации продолжают атомарный audit/version workflow TASK-011.
-
-Total Revenue = сумма поступлений за всё время (с налогом); Paid MTD = поступления текущего UTC-месяца по receivedAt. Outstanding/Overdue = положительный остаток выданных счетов, без DRAFT/CANCELLED, с учётом частичных платежей. AR aging по dueDate: current, 1–30, 31–60, 61–90, 90+; current включает будущий срок и сегодняшний день. Все деньги приходят из PostgreSQL как точные строки копеек. Recharts v2 получает только ограниченную числовую проекцию 0–100 для геометрии; tooltip/data tables/KPI сохраняют точные суммы даже выше Number.MAX_SAFE_INTEGER. Валюты RUB/USD/EUR выбираются отдельно, без конвертации и смешивания.
-
-`/finance/payments` — серверный initialData и клиентский реестр нормализованных поступлений с поиском, валютой, способом, UTC date range и пагинацией. Page/count читаются через Promise.all. Dialog выбирает отправленный/просроченный счёт через две параллельные bounded queries и переиспользует InvoicePaymentDialog/createInvoicePayment. Успешная запись инвалидирует /finance/payments, invoice и dashboard. Старый Document реестр сохранён отдельно. CRM/project operational summaries пока используют существующий Document-слой. Файлы тестов вне CHECKPOINT не добавляются.
-
-## Finance Invoice CRUD — TASK-011
-
-Нормализованные Invoice/InvoiceItem/Payment получают отдельный workflow на /finance; прежний Document реестр сохранён в /finance/documents через явно названные совместимые actions. Invoice.version защищает aggregate строк; редактирование/удаление допустимо только для неоплаченного DRAFT. SENT фиксирует выдачу, не отправку email; PAID выводится из платежей. Просрочка вычисляется по UTC calendar date без неаудированных записей во время чтения. Нумератор InvoiceSequence по workspace/year сохраняется после удаления черновиков; при create increment, строки и audit атомарны. Только гарантированный rollback PostgreSQL P2034 допускает ограниченный повтор транзакции.
-
-Количество имеет до 3 знаков, цены — целые копейки. Расчёты используют BigInt: каждая qty×price округляется half-up до копейки, налог — half-up от subtotal, total=subtotal+tax. Переполнение Decimal(20,0) отклоняется. Валюты формы RUB/USD/EUR (2 знака). PDF строится @react-pdf/renderer в Node route с повторной проверкой workspace и canExport. Локальный статический Geist TTF/OFL, customer/issuer snapshots и палитра из CSS variables не требуют внешних запросов при экспорте. Тестовые файлы вне CHECKPOINT не добавляются.
-
-## Vercel deployment
-
-Production использует существующий проект erp и Prisma Postgres через server-only DATABASE_URL. Локальный файловый demo не применяется на serverless filesystem. vercel.json запускает scripts/vercel-build.mjs: generate → только при VERCEL_ENV=production prisma migrate deploy → необязательный bootstrap из SEED_ADMIN_* → next build. Preview не выполняет миграции/seed, поскольку существующая интеграция использует общий DATABASE_URL для Production и Preview. Production требует AUTH_SECRET, HTTPS AUTH_URL и отключённый ERP_DEMO_MODE; bootstrap idempotent и не заменяет существующий пароль. После первого запуска bootstrap password удаляется из Vercel env. .vercel и локальные env/credentials исключены из Git; значения секретов не попадают в отчёты.
-
-## Текущая версия
-
-Модульный монолит Next.js 15 App Router на Node.js. В одном приложении работают маршруты, Server Actions, бизнес-сервисы и репозиторий. PostgreSQL подключён через Prisma 6. Версии закреплены lock-файлом. Фронтенд: React, Tailwind 3, Shadcn/Radix, TanStack Table, React Hook Form + Zod, Recharts, DnD Kit. TASK-001 переводит шрифты на `Geist` и `Geist_Mono` из `next/font/google`.
-
-## Design System
-
-TASK-001: база Slate, однотонный акцент Indigo-Violet. `components.json` задаёт `style: new-york`, `baseColor: slate`, `cssVariables: true`. Существующий проект не переинициализируется вложенным `create-next-app`; сохраняются App Router, `src/`, alias `@/*`, Next.js 15 и строгие настройки TypeScript.
-
-### Цвета и Tailwind
-
-`src/app/globals.css` — единственный источник палитры. `--color-*` хранят **каналы HSL**, а компоненты используют `hsl(var(--color-token))`. `:root` задаёт светлую Slate-палитру, `.dark` переопределяет все цветовые токены. Каноническое имя основного текста — `--color-foreground`; `--color-text` сохранён как совместимый alias. Основной акцент в светлой теме: `--color-primary: 262 80% 50%`; в тёмной светлота увеличена до 74% для контраста. Синие CTA и голубо-фиолетовые градиенты не применяются.
-
-Семантические статусы используют `--color-success`, `--color-warning`, `--color-danger`, `--color-info` и соответствующие мягкие поверхности. Overlay/glass/shadow содержат alpha внутри HSL-токена и применяются через `hsl(var(...))`. `--color-transparent` остаётся CSS-значением `transparent`.
-
-Shadcn aliases (`--background`, `--foreground`, `--primary`, `--card`, `--popover`, `--muted`, `--border`, `--input`, `--ring`, `--sidebar-*`) ссылаются на ERP-токены. `tailwind.config.ts` включает `darkMode: ["class"]`, semantic colors с поддержкой alpha, Geist font families, radius scale, тени через `--color-shadow` и `tailwindcss-animate`. Классы `bg-primary`/`text-foreground` являются отображением CSS variables; прямые цветовые utility-классы не используются.
-
-### Типографика и темы
-
-`layout.tsx` импортирует `Geist` и `Geist_Mono` из `next/font/google`, subsets `latin`/`cyrillic`, `display: swap`, переменные `--font-geist-sans`/`--font-geist-mono`. Next.js загружает файлы при сборке и отдаёт их локально из `/_next/static/media`; браузер не обращается к Google Fonts. Для первой сборки требуется доступ к Google Fonts. Inter отсутствует.
-
-Общий ThemeProvider на `next-themes` управляет классом `dark`/`light` на `<html>`, хранит выбор в `erp-theme` и устанавливает тему до гидратации. Тёмная тема используется по умолчанию. Отдельный механизм `data-theme` удалён, чтобы разные наборы компонентов не расходились по теме. Settings и Sonner используют один provider.
-
-### Компоненты
-
-В `src/components/ui/`: Button, Input, Label, Textarea, Select, Table, Badge, Avatar, DropdownMenu, Dialog, Sheet, Sidebar, Card, Form, Command, Popover, Calendar, Separator, Skeleton, Tooltip и Sonner. Существующие Button/Input/Badge/Dialog адаптированы с сохранением совместимости используемых бизнес-экранов; остальные получены Shadcn CLI и доработаны под правила проекта. Дополнительный Tooltip установлен как зависимость Sidebar.
-
-`toast.tsx` — совместимый entry point к Sonner: `import { toast } from "@/components/ui/toast"`. Старый Radix Toast больше не поставляется актуальным registry, вместо него используется поддерживаемый Sonner и один Toaster в корневом layout. Toast получает цветовые классы из общей палитры.
-
-Каталог `/design-system` защищён общим dashboard layout и содержит интерактивные примеры всех основных primitives, включая RHF-валидацию, календарь, Sheet, Command и уведомления. Он не добавлен в бизнес-навигацию; предназначен для разработки и визуальной проверки. Примеры не создают бизнес-записи. Calendar по умолчанию использует русскую локаль и доступные русские названия элементов управления.
-
-Form-компоненты используют RHF/Zod и Radix Slot/Label. Публичный `useFormField()` возвращает Result: отсутствие FormProvider/FormField/FormItem отображается ошибкой конфигурации вместо `throw`. Публичный `useSidebar()` тоже возвращает Result; встроенные sidebar primitives при отсутствии provider остаются инертными. Skeleton имеет детерминированную ширину для стабильной гидратации.
-
-### Движение и доступность
-
-Существующие панели и бизнес-элементы используют entrance fade/slide, новые primitives — `motion-fade` без изменения transform, чтобы не нарушать позиционирование Radix. После entrance animation стиль возвращается к обычным CSS-правилам, поэтому анимация не перекрывает opacity состояния disabled. Sheet и popover сохраняют анимации открытия/закрытия. Skeleton сочетает fade-in и pulse. `prefers-reduced-motion` ограничивает анимацию одним коротким циклом. У интерактивных элементов — focus ring, у модальных окон — Radix focus trap, заголовки/описания и Escape. CommandDialog содержит обязательные доступные Title/Description.
-
-### Зависимости и пределы TASK-001
-
-Добавлены Auth.js v5 (`next-auth@5.0.0-beta.32`), TanStack Virtual, DnD Sortable, date-fns, cmdk, Sonner и зависимости UI. На момент выполнения v5 опубликован под beta-tag; точная версия закрепляется в manifest/lock. В TASK-001 установка Auth.js ещё не меняла авторизацию; TASK-004 ниже выполняет переход на Credentials/JWT. Данные и доменная логика модулей не меняются. Проверка TASK-001 — `npm run build` и визуальный осмотр, без новых тестовых файлов вне CHECKPOINT.
-
-## Поток операции
-
-`page → module component → shared UI → module action → module service → document service → repository`.
-
-`getSession()` определяет workspace и роль. Сервис проверяет полномочия, Zod-схему домена, версию и бизнес-инварианты. Репозиторий ограничивает запрос workspace и сохраняет документ, поступление и событие аудита в одной транзакции. Ожидаемые ошибки и сбои инфраструктуры преобразуются в `Result`; исключения наружу намеренно не выбрасываются. Обработчик `error.tsx` нужен для непредвиденных ошибок рендера самого React/Next.js.
-
-## Shared-контракты и Result — TASK-003
-
-`src/types/shared.ts` — общий контракт без зависимостей от React, Prisma и серверного окружения:
+**Решение.** Бизнес-фасады возвращают discriminated union:
 
 ```ts
+type Result<T, E = AppError> =
+  | { ok: true; data: T }
+  | { ok: false; error: E };
+
 type AppError = {
   code: ErrorCode;
   message: string;
   meta?: Record<string, unknown>;
 };
-type Result<T, E = AppError> =
-  | { ok: true; data: T }
-  | { ok: false; error: E };
 ```
 
-Сервисы и Server Actions возвращают `Result<T>` или `Promise<Result<T>>`. Проверка `ok` сужает union: до неё нельзя читать data/error. Ошибка — обычный объект, не Error instance; она пригодна для передачи через границу сервера при условии JSON-совместимых data/meta. `E` позволяет явно задать собственный тип ошибки, но shared-конструкторы используют AppError. В React-компонентах и чистых форматтерах сохраняется естественный return type (JSX/string); Result применяется к операциям, которые возвращают ошибку вызывающему коду.
+`ErrorCode`: `VALIDATION`, `UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `STORAGE`, `CONFIGURATION`. Используются `ok`, `err`, `createError`, `isNotFound`; `success`/`failure` сохранены как совместимые aliases. Ответ содержит сериализуемые DTO: Date → ISO/date-only, Decimal/BigInt → десятичная строка. В meta не передаются stack, SQL, секреты или Prisma-объекты.
 
-```ts
-import { err, ok } from "@/lib/errors";
-import type { Result } from "@/types/shared";
+**Альтернативы.** Исключения для ожидаемых исходов делают UI-ветвления неявными; nullable result теряет причину отказа.
 
-/** Validate an example label using the shared outcome contract. */
-function validateLabel(value: string): Result<string> {
-  const label = value.trim();
-  return label ? ok(label) : err("VALIDATION", "Введите название");
-}
+**Последствия.** Нужно явно проверять `result.ok`. JSX и чистые helpers сохраняют естественные типы; Credentials `authorize` возвращает User/null по Auth.js, HTTP handler — Response с сериализованным Result. Внутренние исключения БД перехватываются серверной границей. Возврат `err(...)` из Prisma transaction callback сам по себе **не откатывает** уже сделанные записи: проверки выполняются до записи, а неожиданный сбой записи должен прервать транзакцию. Источники: [shared.ts](../src/types/shared.ts), [errors.ts](../src/lib/errors.ts).
 
-const result = validateLabel("Счёт");
-if (result.ok) console.log(result.data);
-else console.error(result.error.message);
-```
+### ADR-004 — Server Actions
 
-`src/lib/errors.ts` предоставляет `ok(data)`, `err(code, message, meta?)`, `createError(code, message, meta?)` и `isNotFound(error: unknown)`. `createError` возвращает AppError, `err` — failed Result; отсутствующее meta не добавляется как undefined при exactOptionalPropertyTypes. `isNotFound` принимает AppError, failed Result или Prisma-подобную ошибку с code=P2025 и возвращает boolean. Он не импортирует Prisma, не распознаёт ошибки по тексту и не преобразует прочие сбои в NOT_FOUND. Имена `success` и `failure<T>` сохранены для существующих потребителей и используют те же конструкторы.
+**Контекст.** Формы и DnD должны использовать одну бизнес-операцию с повторной серверной авторизацией.
 
-ErrorCode: VALIDATION, UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT, STORAGE, CONFIGURATION. Сбой внешней библиотеки перехватывается на границе инфраструктуры и превращается в безопасное сообщение; не передавать stack, пароли, SQL или необработанное исключение в meta. Helpers не выполняют автоматическую очистку произвольных metadata. HTTP-статус назначает route handler, UI показывает сообщение из Result.
+**Решение.** `actions.ts` с `"use server"` — тонкий публичный фасад: вызов access/query/service, локализация Result и revalidation затронутых путей после успешного commit. Имена `getXxx/createXxx/updateXxx/deleteXxx`; UI callbacks — `handleXxx`. Read Server Components вызывают серверные queries. Экспорт/PDF остаются Route Handlers с собственными live guard и проверкой canExport.
 
-### Пагинация, сортировка и фильтры
+**Альтернативы.** Полный REST CRUD поверх тех же сервисов дублировал бы transport; клиентская валидация без серверной не защищает данные.
 
-`PaginatedResponse<T> = { data: T[]; total: number; page: number; pageSize: number; totalPages: number }`. Page начинается с 1, pageSize положительный, total — число записей после фильтрации до пагинации; totalPages = ceil(total / pageSize), для пустого набора 0. Чтение может возвращать `Promise<Result<PaginatedResponse<T>>>`. Метаданные формирует сервис; shared-тип сам не проверяет их арифметику и не включает серверную пагинацию в существующий UI.
+**Последствия.** Server Action доступна независимо от видимости кнопки: схема, tenant и role обязательны на сервере. Клиент скрывает недоступные действия лишь для UX. После конфликта UI перечитывает актуальные данные; сбой refresh после commit не означает откат и не должен вызывать слепое повторение платежа. Источники: [CRM actions](../src/modules/crm/actions.ts), [Finance actions](../src/modules/finance/actions.ts), [PDF route](../src/app/api/finance/invoices/[id]/pdf/route.ts).
 
-`SortConfig<TField extends string = string>` содержит field и direction: asc/desc. Несколько ключей передаются массивом с явным приоритетом. `FilterConfig<TField>` — union по operator: eq/ne принимают scalar string/number/boolean/null; contains/startsWith/endsWith — string; gt/gte/lt/lte — number или ISO string; in/notIn — массив scalar; isNull/isNotNull — без value. Пример: `SortConfig<"number" | "dueDate">`, `FilterConfig<"status" | "total">`. Даты передаются ISO-строками, точные Decimal — строками; числовое сравнение Decimal-строк нужно реализовать в БД, не лексикографически в JS. Публичный endpoint обязан валидировать вход Zod, whitelist полей/операторов и workspace. Эти типы не являются готовым Prisma where/orderBy.
+### ADR-005 — Prisma и PostgreSQL
 
-### Утилиты и клиент БД
+**Контекст.** Финансы, остатки, ссылки между доменами и аудит требуют транзакций и ограничений в БД.
 
-`src/lib/utils.ts` используется сервером и клиентом:
+**Решение.** Один server-only Prisma singleton; в development используется globalThis для HMR, в production — экземпляр модуля. Схема содержит 27 моделей и 15 enum. Tenant-модели имеют workspaceId, индексы и составные ключи/FK `(id, workspaceId)`; ссылки на участников используют Membership. Миграции хранят и SQL CHECK/trigger, которые Prisma schema целиком не выражает. Нет DB RLS: каждое чтение и запись обязаны ограничивать workspace на уровне приложения.
 
-| API | Контракт |
-| --- | --- |
-| `cn(...inputs)` | clsx + tailwind-merge, условные классы и устранение Tailwind-конфликтов |
-| `formatCurrency(amount, currency = "RUB")` | Целые минимальные единицы: safe integer number, bigint или целочисленная Decimal-строка. Количество знаков определяется валютой (RUB/USD 2, JPY 0, KWD 3). Вывод ru-RU без дробной части при целой сумме; разделение целой/дробной частей через BigInt исключает потерю точности. Пример: 12345 → 123,45 ₽. Некорректное значение/код валюты → «—» |
-| `formatDate(date, format = "dd.MM.yyyy")` | ISO string, Date или epoch milliseconds; Unicode-токены date-fns, locale ru, **локальная зона среды выполнения**. Чистая дата разбирается как локальная календарная дата, timestamp — как момент времени. Неверная дата/формат → «—». Для SSR/client одного timestamp требуется согласованная timezone либо заранее отформатированный сервером текст |
-| `generateId(prefix = "")` | crypto.randomUUID(), без prefix — UUID, с prefix — prefix_UUID. Prefix задаётся кодом, генерация выполняется в обработчике/сервисе, не при рендере. Требуется поддерживаемый Node.js или secure browser context; ID не заменяет токен сессии |
-| `truncate(value, maxLength = 80, suffix = "…")` | Длина в графемах через Intl.Segmenter, суффикс входит в лимит. Не разрезает combining sequences или emoji; неположительный/нечисловой лимит → пустая строка |
+Изменяемые сущности проверяют ожидаемую version, обновление увеличивает её. Создание начинается с version 1; отсутствие Settings/StockItem/LeaveAllowance имеет специальные сценарии version 0. Создание неизменяемого ledger не требует версии несуществующей записи, но проверяет версии затронутых остатков. Business write и audit выполняются в одной транзакции.
 
-Совместимые `money(amount, compact)` (RUB-копейки), `dateLabel(value)` (краткая дата в Europe/Moscow) и `initials` сохранены. Обычный money использует formatCurrency, compact сохраняет прежнее сокращение. Форматтеры — только отображение; «—» не заменяет валидацию денежного ввода. Сервисы документов и платежей используют общий generateId без изменения UUID-формата существующих идентификаторов.
+Finance/Inventory/HR/Projects используют Serializable wrappers с максимум тремя попытками **только при P2034**, означающей откат. CRM и Settings не имеют такого автоматического retry; Settings дополнительно перепроверяет активного actor/role внутри транзакции. Нельзя приписывать всем модулям одинаковую политику повторов или in-transaction recheck прав. Для согласованных списков/агрегатов Projects использует RepeatableRead. Независимые запросы запускаются Promise.all, но это не общий snapshot.
 
-`src/lib/db.ts` закрыт `server-only`. Единственный экспорт db берётся из `globalThis.prisma` либо создаётся через `new PrismaClient()`. В development клиент сохраняется в globalThis для hot reload; в production используется кеш модуля, без глобального сохранения нового клиента. Не вызывать disconnect после каждого запроса и не создавать PrismaClient внутри services/components. Новый singleton не устанавливает соединение до первого запроса; ошибки запросов обрабатывает repository, демофолбэка нет.
+Для сложных агрегатов — tagged `$queryRaw` с параметрами; поля сортировки/SQL identifiers выбираются из whitelist. Shared literal search учитывает кириллицу и экранирует wildcard. UI не передаёт произвольный Prisma where/orderBy. Пагинация выполняется сервером, DTO не содержат Prisma instances.
 
-## DocType и домены
+**Альтернативы.** JSON-only документы не обеспечивают нужные связи; прямые SQL-конкатенации небезопасны; SQLite не заменяет PostgreSQL-инварианты.
 
-TASK-002 добавляет нормализованную схему всех модулей: Contact/Deal/Activity, Invoice/InvoiceItem/Payment, Product/Warehouse/StockItem/StockMovement, Employee/Leave, Project/Task. AUTH расширен полями UserRole/isActive, членством и структурированным AuditLog. Всего 21 модель и 13 enums. Полное описание связей, единиц измерения, FK и границ ответственности — [modules/database.md](modules/database.md).
+**Последствия.** Миграции обязательны; ошибка БД возвращает STORAGE, не демоданные. Наличие composite FK защищает ссылки, но не заменяет tenant-фильтры чтений. Источники: [db.ts](../src/lib/db.ts), [schema](../prisma/schema.prisma), [migrations](../prisma/migrations), [Projects mutation](../src/modules/projects/task-service.ts).
 
-Пять каталогов модулей имеют `types.ts`, `schema.ts`, `actions.ts`, `queries.ts`, `service.ts`, `config.ts`, `components/`. Общая модель `Document` хранит `domain`, `workspaceId`, `version`, временные метки и JSONB `data`. JSON-поля валидируются на чтении из PostgreSQL и на каждой записи. У каждого домена отдельный enum статусов и уточнения схемы; доменные типы выводятся через Zod.
+### ADR-006 — Shadcn и CSS variables
 
-Базовая форма документа содержит `title`, `subtitle`, `status`, `amount`, `quantity`, `email`, `date`, `progress`, `notes`. В разных DocType поля имеют доменные подписи. Такое ограниченное ядро позволяет переиспользовать форму и таблицу без дублирования CRUD. Это фиксированные схемы, не реализованный конструктор пользовательских объектов. При усложнении домена следует расширять его схему или выделять реляционные модели и сервисы, сохраняя контракты Result.
+**Контекст.** Таблицам, формам и модальным сценариям нужны единые темы, доступность и mobile поведение.
 
-Деньги — целые копейки. UI принимает рубли и переводит их в копейки на границе формы. Переходный `DocumentPayment` сохраняет прежний PostgreSQL Int и лимит 20 млн ₽ за операцию; JSON-документы сохраняют текущий лимит суммы 10 млрд ₽. Новые денежные поля Contact-связанных сделок/счетов/товаров/проектов используют Prisma Decimal(20,0), тоже в минимальных единицах. Нормализованный Payment относится к Invoice и хранится отдельно от DocumentPayment. TaxRate — Decimal(5,2), количества — Decimal(20,3). Суммы новых типов нельзя без проверки диапазона преобразовывать в JS number; передавать в DTO строкой. Новые таблицы подготовлены, но UI и полноценные налоговые/бухгалтерские сервисы ещё не переведены на них.
+**Решение.** Переиспользуемые primitives находятся в `src/components/ui`; Radix управляет focus/keyboard у соответствующих Dialog/Sheet. Семантические Tailwind-классы ссылаются на HSL CSS variables из globals.css. Палитра не задаётся внутри компонентов. Тема `.dark` управляется общим ThemeProvider. Шрифты Geist Sans/Mono; Sonner — общие уведомления. Entrance animations и prefers-reduced-motion задаются общими motion-правилами.
 
-## Хранение
+**Альтернативы.** Цвета и виджеты по отдельности в модулях расходятся при смене темы; полная UI-библиотека навязала бы другой визуальный контракт.
 
-- **PostgreSQL**: нормализованные модели TASK-002 и переходный Document-слой. `UserRole` отображается на старый enum `Role`, `AuditLog` — на таблицу `AuditEvent`, `DocumentPayment` — на старую `Payment`, а новый `Payment` — на `invoice_payments`. Начальная миграция сохранена; `20261018065839_init_all_modules` добавляет таблицы и поля без удаления старых данных. Миграция выполняется транзакционно, содержит 43 CHECK-ограничения и составные tenant-FK. Ссылка на исполнителя/владельца всегда проверяет Membership в том же workspace. Индексы и бизнес-идентификаторы ограничены tenant. Текущий repository использует `auditLog`/`documentPayment`, сохраняя контракт UI. Проверка версии через `updateMany/deleteMany` защищает текущие документы от параллельной записи.
-- **Демо**: `ERP_DEMO_MODE=true`, общее пространство `demo-workspace`, явно отмеченные примеры. JSON в `.data/demo-workspace.json`. В одном Node.js-процессе операции сериализуются очередью `globalThis`; запись идёт во временный файл и атомарный rename. Файл проверяется схемой; повреждение не приводит к тихой потере или пересозданию данных. Несколько процессов и serverless для демохранилища не поддерживаются.
-- **Без fallback**: выключенный деморежим всегда использует PostgreSQL. Сбой БД отображается ошибкой.
+**Последствия.** Новый UI использует существующие Button/Table/Sheet/EmptyState и токены. Ни hex, ни прямые цветовые Tailwind utilities не подменяют tokens. Sidebar становится Sheet при ширине <768px; таблицы/Kanban прокручиваются внутри области. `loading.tsx`, error boundaries и информативные empty states — часть маршрута. Источники: [globals.css](../src/app/globals.css), [UI](../src/components/ui), [TASK-026](TASK-026.md).
 
-## Tenant isolation и RBAC
+### ADR-007 — TanStack Table
 
-TASK-004 использует NextAuth v5 (`next-auth@5.0.0-beta.32`), Credentials provider и JWT strategy. `/api/auth/[...nextauth]` предоставляет GET/POST Auth.js; callback JWT записывает id, role, workspaceId и внутренний sessionId. Session callback передаёт user.id/user.role/workspaceId/workspaceName и expires, но не sessionId, хеш пароля или JWT. Module augmentation находится в `src/types/next-auth.d.ts` (JWT расширяет исходный `@auth/core/jwt`).
+**Контекст.** Рабочие реестры требуют типизированных колонок, server pagination, сортировки и bulk selection.
 
-Credentials разбираются через Zod, пароль проверяется существующим scrypt с солью и constant-time сравнением; неизвестный email выполняет dummy scrypt. Provider возвращает User/null по контракту Auth.js, а бизнес-фасад и Server Actions — Result. Исключения библиотеки ловятся в auth-actions.ts. Email нормализуется, роль и workspace из формы/update payload не принимаются: вход выбирает первое активное Membership по workspaceId. User.role не предоставляет обхода Membership, в том числе для SUPER_ADMIN.
+**Решение.** Headless TanStack Table управляет моделью таблицы; DOM/стили остаются в UI проекта. Server query владеет поиском, фильтрами, сортировкой и общим count. Контракты `PaginatedResponse`, `SortConfig`, `FilterConfig` находятся в shared.ts. Пустой результат имеет totalPages 0; page — с единицы. Клиент не сортирует только текущую страницу, выдавая её за полный набор.
 
-JWT зашифрован и защищён Auth.js в HttpOnly/SameSite=Lax cookie; на HTTPS используется Secure cookie с __Secure-prefix. Обязателен AUTH_SECRET (или совместимый NEXTAUTH_SECRET), AUTH_URL задаёт публичный origin с HTTPS для внешнего production. Ключ не генерируется автоматически и не попадает в NEXT_PUBLIC. Срок доступа — 12 часов: в Session хранится SHA-256 случайного registry ID, user/workspace и фиксированный expiresAt. Этот ID включён в защищённый JWT, сама таблица не содержит cookie. При каждом чтении JWT повторно проверяются registry, срок, User.isActive, Membership.isActive и текущая Membership.role. Поэтому смена роли/отзыв действуют на следующей серверной операции, даже если браузер ещё показывает прежние кнопки. Logout сначала удаляет точную запись registry, затем Auth.js очищает cookie; событие signOut также отзывает запись для стандартного Auth.js endpoint. Старые opaque erp_session cookie не принимаются: после обновления требуется новый вход. Старые строки Session не превращаются в JWT автоматически.
+**Альтернативы.** Самописная таблица дублирует selection/sorting; клиентская загрузка всего реестра не подходит растущим данным.
 
-На сбое PostgreSQL JWT не получает права и session содержит authError; серверный Result возвращает STORAGE, UI hook блокирует действия. Отключённое членство даёт FORBIDDEN, отозванная/истёкшая сессия или неактивный User — UNAUTHORIZED. Ошибка инфраструктуры никогда не открывает демопространство. ERP_DEMO_MODE=true по-прежнему явно включает публичный учебный доступ: сервер и `/api/auth/session` возвращают одну synthetic ADMIN identity без БД; это отдельный режим, не доказательство реального входа.
+**Последствия.** Паттерны CRM переиспользованы в Projects и других реестрах. CRM selection между страницами хранит ID/version, сервер заново проверяет права и записи; bulk ограничен, экспорт защищён отдельно. Нельзя считать все legacy-таблицы уже переведёнными на этот контракт. Источники: [CRM components](../src/modules/crm/components), [Projects components](../src/modules/projects/components), [TASK-007](TASK-007.md).
 
-### Матрица разрешений
+### ADR-008 — DnD Kit
 
-Каноническая client-safe матрица — `src/lib/permissions.ts`, PERMISSIONS/hasPermission также экспортируются из `src/lib/auth.ts`. Клиент импортирует только permissions.ts, чтобы не включать Prisma/secret в bundle.
+**Контекст.** CRM pipeline и Projects Kanban имеют одинаковый механический drag/drop, но разные workflow.
 
-| Роль | canDelete | canExport | canManageUsers | canViewAll |
-| --- | --- | --- | --- | --- |
-| SUPER_ADMIN | Да | Да | Да | Да |
-| ADMIN | Да | Да | Да | Да |
-| MANAGER | Да* | Да | Нет | Да |
-| AGENT | Нет | Нет | Нет | Да |
-| READONLY | Нет | Нет | Нет | Да |
+**Решение.** DnD Kit core/sortable и общий [use-kanban-dnd.ts](../src/hooks/use-kanban-dnd.ts); модуль задаёт колонки, карточку и action перехода. Optimistic UI хранит предыдущий snapshot, передаёт expected version, при отказе восстанавливается и перечитывает сервер. Мышь/касание/клавиатура используют общие sensors.
 
-Матрица — явная стартовая политика, поскольку конкретные значения не были заданы TASK-004. canViewAll означает просмотр всех документов **текущего workspace**, доступ к которому уже проверен; не других tenants и не обход HR field-level policy. Все пять ролей сохраняют прежний доступ на чтение. AGENT создаёт/изменяет записи без удаления/экспорта; READONLY не выполняет мутации. * MANAGER дополнительно не удаляет HR-записи. Счета с платежами защищены при любой роли. hasPermission для неизвестной/отсутствующей роли возвращает false. canManageUsers — право для будущего управления участниками; сам экран/endpoint этой задачей не создаётся.
+**Альтернативы.** Отдельный hook для каждой доски нарушает DRY; собственный drag engine усложняет доступность и pointer handling.
 
-AuthSessionProvider оборачивает dashboard с проверенной сервером initial Session. `usePermissions()` использует useSession и возвращает role, can(permission), isAdmin и isLoading. При loading, unauthenticated или authError права закрыты. isAdmin истинен только для ADMIN/SUPER_ADMIN. Обновление сессии при фокусе и каждые 60 секунд подтягивает роль в UI; сервер не ждёт этого обновления. Рендеры таблиц, kanban, кнопок создания/удаления/экспорта и settings используют те же правила.
+**Последствия.** DnD не обходит status schema, RBAC и audit. Projects сохраняет статус, а не пользовательский rank: после refresh применяется серверный порядок updatedAt/id. Серверные страницы колонок не означают загрузку всех задач. Источники: [TASK-008](TASK-008.md), [TASK-021](TASK-021.md).
 
-Сервис authorize защищает create/update/delete, repository проверяет canViewAll и workspace, экспортные Server Actions повторно проверяют canExport и читают данные только из своего workspace. getExportDocuments принимает domain/IDs, проверяет Zod и отклоняет недоступный ID; dashboard CSV формируется из свежих серверных нормализованных агрегатов. Скрытая кнопка не является защитой. Разрешение экспорта управляет предоставляемой функцией и endpoint; оно не мешает человеку вручную скопировать уже доступные для чтения данные. Управление Membership, invitations, переключение workspace и отдельные права payroll остаются следующими задачами.
+### ADR-009 — NextAuth v5
 
-## Events и UI
+**Контекст.** Нужны парольный вход и отзыв доступа при изменении Membership без доверия устаревшему JWT role.
 
-AuditLog (таблица AuditEvent для совместимости) — транзакционный журнал мутаций, не шина асинхронных обработчиков. Добавлены actorId → Membership, entityType/entityId, before/after и requestId. Текущий repository сохраняет actorId и идентификатор документа; UI по-прежнему получает компактный AuditEvent DTO. Dashboard и панель событий читают последние 50 записей; PostgreSQL сохраняет весь журнал. В демофайле журнал ограничен 50 событиями. Outbox, подписчики, гарантированная доставка и workflow engine остаются отдельным этапом.
+**Решение.** NextAuth v5 Credentials, JWT strategy, зашифрованная HttpOnly/SameSite=Lax cookie; Secure на HTTPS. AUTH_SECRET (совместимо NEXTAUTH_SECRET) обязателен, URL — AUTH_URL/NEXTAUTH_URL. Пароли — salted scrypt с constant-time сравнением. Session в PostgreSQL — реестр отзыва с tokenHash, а не PrismaAdapter database session strategy; сырой cookie/token в БД не хранится. Срок серверной сессии фиксирован: 12 часов.
 
-Сборка UI основана на общих `src/components/ui/`, `blocks/`, `layout/`. ModuleWorkspace соединяет форму, таблицу и kanban. После успешной мутации UI обновляет запись и запрашивает новый серверный snapshot через `router.refresh()`. Финансовый dashboard TASK-012 агрегирует Invoice/Payment на сервере: отдельные валюты, шесть месяцев поступлений и текущие остатки/aging. Operational summaries пока считают активные записи прежнего Document-слоя. CSV содержит отображаемые/выбранные строки и защищён от formula injection.
+На проверке сессии перечитываются реестр/срок, Workspace, User.isActive, Membership.isActive и текущая role. Login выбирает последнее использованное активное Membership. SUPER_ADMIN также ограничен им. UI AuthSessionProvider/usePermissions закрывает права при loading/authError и обновляет сессию периодически/при focus, но не заменяет server guard.
 
-Палитра только через CSS variables в `globals.css`; тёмная и светлая темы. Анимации входа у панелей, строк и UI primitives; `prefers-reduced-motion` отключает движение. Radix обеспечивает focus trap в модальных окнах. Мобильный sidebar открывается диалогом. Горизонтальная прокрутка ограничена таблицами и kanban.
+**Альтернативы.** Только JWT claims оставляют старые права до expiry; отдельная auth-система увеличивает объём собственного security-кода.
 
-## Layout Shell — TASK-005
+**Последствия.** STORAGE при отказе БД закрывает доступ; деморежим — отдельный явный opt-in, нормализованные домены его не используют. Invitations: одноразовый 7-дневный token, SHA-256 hash в БД, проверка полномочий пригласившего при принятии. UI выдаёт ссылку; email transport не подключён. Нет MFA, password reset, rate limiter и полноценного workspace switch. Источники: [auth.ts](../src/lib/auth.ts), [auth-service.ts](../src/lib/auth-service.ts), [Settings service](../src/modules/settings/service.ts), [TASK-024](TASK-024.md).
 
-AppShell использует общий `SidebarProvider` и `Sidebar` из `src/components/ui/sidebar.tsx`; отдельный механизм collapse не вводится. `app-sidebar.tsx` отображает одно меню на desktop и в мобильном Sheet. Навигация задаётся единожды в `navigation.ts`: Overview → Dashboard; Business → CRM/Finance/Inventory; Operations → HR/Projects; System → Settings. Эти же ссылки используются в Header breadcrumbs и глобальном поиске. Root активен только для `/`, модуль — для точного пути и вложенных сегментов. Query string не меняет текущий раздел.
+### ADR-010 — Audit Log
 
-Desktop Sidebar имеет ширину 248 px, compact — 80 px. Shared primitive анимирует ширину и flex-spacer CSS transition 200 ms; контент занимает оставшееся место без фиксированного left padding. Desktop начинается с общего Shadcn breakpoint 768 px. В compact links сохраняют aria-label и Tooltip. Пользовательский `sidebar_state` cookie содержит только boolean-предпочтение; dashboard layout читает его при SSR, чтобы сохранить вид после reload. Cookie не участвует в авторизации. Cmd/Ctrl+B переключает Sidebar через существующий provider.
+**Контекст.** Изменение данных должно иметь tenant-scoped след, совпадающий с фактическим commit.
 
-Мобильное меню — Radix Sheet с focus trap, Escape/overlay и явной кнопкой закрытия. Переход по ссылке закрывает Sheet. После обычного закрытия фокус возвращается на Header trigger; при открытии нового диалога фокус остаётся в нём. При выходе на desktop мобильное меню закрывается. SidebarContent прокручивается внутри панели, поэтому группы и профиль доступны на низком экране.
+**Решение.** Доменные audit helpers записывают AuditLog тем же Prisma transaction client, что бизнес-операцию. Поля: workspaceId, actorId/снимок actor, domain, action, entityType/entityId, title, before/after, createdAt; requestId опционален. Action — created/updated/deleted/payment. Prisma AuditLog отображается в таблицу `AuditEvent`; normalized Payment — в `invoice_payments`.
 
-Один active indicator расположен внутри navigation и перемещается CSS `transform` transition 180 ms. Его позиция измеряется по активной ссылке и пересчитывается ResizeObserver после изменения ширины/высоты. Цвет/фон активной строки и `aria-current=page` работают независимо от анимации. Для `/design-system` нет ложного активного пункта.
+Audit хранит сериализуемые снимки без password, token, cookie и секретов; у конфигурации сохраняется признак наличия logo, не PNG. Административный reader дополнительно ограничивает глубину/размер и исключает ключи password/secret/token/hash. Это защита чтения, не основание записывать чувствительные данные. Системные заголовки локализуются по entityType, пользовательские названия сохраняются.
 
-`(dashboard)/template.tsx` создаёт новый wrapper для route content с fade-in 150 ms. AppShell находится в persistent layout, поэтому Sidebar не перемонтируется при переходах. Поиск/query обновления не создают лишнюю route animation; входные анимации отдельных компонентов сохраняются. Все transitions и animations учитывают общий `prefers-reduced-motion` override.
+**Альтернативы.** Клиентский event после ответа теряется при закрытии страницы; post-commit отдельная запись может отсутствовать. Централизованный middleware не знает смысл invoice/payment snapshots.
 
-Header содержит управление Sidebar, breadcrumbs, поиск Cmd/Ctrl+K, уведомления, профиль и переключатель next-themes. Для первого SSR/client render используется нейтральная иконка темы до mount, что исключает hydration mismatch. Header и Settings используют один `erp-theme`/класс `.dark`; после reload тема восстанавливается. Цвета берутся только из semantic CSS variables, Geist и существующие primitives сохраняются.
+**Последствия.** Audit failure откатывает бизнес-запись. Полный viewer ADMIN+ показывает последние 100 событий; Dashboard — последние 8 безопасных summaries без before/after; legacy snapshot ограничивает UI-историю 50 событиями, панель уведомлений — 12. Notification toggles фильтруют панель, не запись аудита. PostgreSQL хранит историю дольше UI-выборок. AuditLog append-only по соглашению приложения: DB trigger неизменяемости введён для StockMovement, не для всего аудита. requestId не даёт универсальную идемпотентность, outbox/exactly-once не реализованы. Источники: [schema](../prisma/schema.prisma), [Settings queries](../src/modules/settings/queries.ts), [Dashboard queries](../src/modules/dashboard/queries.ts), [repository](../src/lib/repository.ts).
 
-Общие entrance keyframes именуются `component-enter`, чтобы не конфликтовать с `enter` из tailwindcss-animate и сохранить slide у Sheet. `/favicon.ico` перенаправляется на существующий `/icon.svg`, поэтому запросы старых браузерных вкладок не дают лишний 404.
+## 3. RBAC и tenant isolation
 
-## Границы текущего шаблона
+Единственный общий источник ролей/флагов — [permissions.ts](../src/lib/permissions.ts). Ни роль из формы, ни скрытая кнопка не являются авторизацией. Unknown/missing role и permission отклоняются. Все разрешения ниже действуют **только в активном workspace**.
 
-Нет production rate limiting входа, MFA, восстановления пароля, переключения tenants, RLS, field-level RBAC, фоновой очистки сессий и резервного копирования. Operational summaries dashboard и прежние модульные экраны получают snapshot Document-слоя всего workspace; финансовый dashboard TASK-012 использует ограниченные SQL-агрегаты нормализованных Invoice/Payment. Таблица Contacts и отдельная воронка Deal используют серверную пагинацию нормализованных моделей; нужны перевод остальных экранов/данных, пагинация остальных модулей и SQL-агрегации. В TASK-002 миграция и ряд FK/CHECK проверены на живой локальной PostgreSQL 17. TASK-004 проверяет основные HTTP-сценарии Credentials/JWT и RBAC вручную; TASK-006 — CRM API, гонку одной версии и rollback аудита. Полная автоматическая проверка ролей, гонок и всех новых доменных сервисов остаётся CHECKPOINT. Не заявлять production readiness до его завершения.
+### Базовая матрица
 
-## CRM Server API — TASK-006
+| Role | canWrite | canDelete | canExport | canManageUsers | canViewAll |
+| --- | --- | --- | --- | --- | --- |
+| SUPER_ADMIN | Да | Да | Да | Да | Да |
+| ADMIN | Да | Да | Да | Да | Да |
+| MANAGER | Да | Да | Да | Нет | Да |
+| AGENT | Да | Нет | Нет | Нет | Да |
+| READONLY | Нет | Нет | Нет | Нет | Да |
 
-Нормализованный поток: `crm/actions → crm/service → Prisma Contact/Deal/Activity`. `crm/access.ts` разрешает Auth.js через `getSession()` и проверяет live Membership/RBAC; workspace и actor берутся только из сессии. В явном деморежиме этот API возвращает CONFIGURATION и не подменяет PostgreSQL файлами.
+canWrite — helper, остальные четыре флага — PERMISSIONS. canViewAll не означает доступ к другой компании или к административному Audit viewer. Ролевой field-level ACL на HR/зарплату сейчас отсутствует.
 
-Zod-схемы строгие: tenant/id/version/timestamps нельзя внедрить в DTO. Изменения и auditLog.create выполняются одной Serializable-транзакцией; обновление/удаление требует ожидаемую version. Ошибки драйвера преобразуются в Result, конфликты сериализации требуют повторного чтения. Сбой аудита откатывает мутацию. После успешного commit действия вызывают revalidatePath для `/crm` и `/`; сбой инвалидирования логируется, но не маскирует уже сохранённый результат.
+### Матрица операций
 
-`queries.ts` читает только текущий workspace. Страница и count согласованы через RepeatableRead; pageSize 1–100, сортировка по whitelist со стабильным id. Kanban возвращает шесть колонок с отдельной ограниченной страницей и total каждой. DTO сериализуют Decimal в точные строки копеек, timestamps в ISO, DATE в YYYY-MM-DD. Контракты и примеры — [modules/crm.md](modules/crm.md).
+«Да» разрешает проверку операции, но не отменяет её workflow/ссылки/version. Порядок ролей — от наиболее привилегированной к READONLY.
 
-Экран сделок `/crm` продолжает использовать Document через явно названные `getDealDocuments/createDealDocument/updateDealDocument/deleteDealDocument`. Он не читает нормализованные Deal и не смешивает их со старой моделью. Contacts подключены отдельной страницей в TASK-007, нормализованная воронка — в TASK-008; перенос прежней таблицы сделок и существующих данных остаётся отдельной задачей.
+| Операция | SUPER_ADMIN | ADMIN | MANAGER | AGENT | READONLY |
+| --- | --- | --- | --- | --- | --- |
+| Читать рабочие CRM/Finance/Inventory/HR/Projects данные | Да | Да | Да | Да | Да |
+| Создавать/обновлять обычные доменные записи | Да | Да | Да | Да | Нет |
+| Удалять CRM/Finance/Inventory/Projects записи | Да | Да | Да | Нет | Нет |
+| Удалять Employee и ссылки на его документы | Да | Да | Нет | Нет | Нет |
+| Создать Payment | Да | Да | Да | Да | Нет |
+| Создать StockMovement | Да | Да | Да | Да | Нет |
+| Изменить/удалить существующий StockMovement | Нет | Нет | Нет | Нет | Нет |
+| Создать Leave | Да | Да | Да | Да | Нет |
+| Approve/Reject Leave, задать годовой allowance, видеть pending approvals | Да | Да | Да | Нет | Нет |
+| Экспорт CRM/P&L CSV, Invoice PDF | Да | Да | Да | Нет | Нет |
+| Читать настройки компании, менять свой язык/тему | Да | Да | Да | Да | Да |
+| Менять company/logo/currency/timezone/date format/notifications | Да | Да | Нет | Нет | Нет |
+| Users, invitations, membership role/status, полный Audit viewer | Да | Да | Нет | Нет | Нет |
+| Назначать/управлять ролью SUPER_ADMIN | Да | Нет | Нет | Нет | Нет |
 
-## CRM Contacts Table — TASK-007
+Дополнительные ограничения:
 
-`/crm/contacts/page.tsx` — Server Component: вызывает tenant-scoped getContacts и передаёт Result первой страницы плюс фиксированное время рендера в ContactsTable. Страница `/crm` сохраняет существующие сделки; общие вкладки связывают два экрана. В деморежиме нормализованные контакты показывают состояние конфигурации, без подмены PostgreSQL.
+- Invoice редактируется и удаляется только как неоплаченный DRAFT; Payment отклоняет переплату и повтор reference. Общего API изменения/удаления Payment нет. Статус PAID не назначается вручную.
+- StockMovement создаёт ledger и balance атомарно; update/delete запрещены также DB trigger, даже при прямом SQL.
+- Leave допускает PENDING → APPROVED/REJECTED; terminal request не имеет edit/delete workflow. Роль MANAGER согласует заявки workspace, Employee.managerId не задаёт отдельное дерево прав.
+- Удаление связанных Contact/Product/Warehouse/Employee и других сущностей может быть запрещено ссылками/историей независимо от роли.
+- Settings запрещает смену собственных role/access и потерю последнего активного администратора; деактивация Membership отзывает его сессии в workspace. Неактивный глобальный User не восстанавливается этой формой.
+- Dashboard Activity и in-app summaries доступны читателям, но не раскрывают before/after административного аудита. Недоступный HR pending KPI обозначается как недоступный, а не 0.
 
-Клиентская TanStack Table v8 использует getRowId=id, manualPagination/manualSorting/manualFiltering. Search debounce 300 ms; stage/sort/search сбрасывают страницу, выбор фильтров также сбрасывает selection. Выбор до 100 id/version сохраняется между страницами, checkbox заголовка действует только на текущую страницу. При загрузке показывается общий Skeleton; устаревшие асинхронные ответы игнорируются. Relative createdAt получает initialNow с сервера, затем обновляется раз в минуту, чтобы не нарушать гидратацию.
+## 4. Доменные инварианты и вычисления
 
-ContactTableRow расширяет Contact безопасным owner summary (id/name/avatar), Prisma include не раскрывает пароль или Membership. getContactAssignees ищет до 50 активных участников своего workspace. Массовые deleteContacts/updateContactsAssignee проверяют все версии/ссылки и выполняют весь набор с audit в одной Serializable-транзакции. При любом конфликте нет частичного успеха; endpoint ограничен 100 разными id. Экспорт getContactsForExport повторно проверяет canExport (MANAGER/ADMIN/SUPER_ADMIN), читает выбранные записи либо полный фильтр с лимитом 5000, без тихого обрезания. CSV использует общий downloadCsv с escaping/BOM и защитой от formula prefixes, включая префиксы после пробельных символов.
+### Деньги и Finance
 
-## CRM Deal Pipeline — TASK-008
+Все новые бизнес-записи и настройки используют **EUR**. Нормализованные деньги — Decimal(20,0), целые евроценты; quantity — Decimal(20,3), taxRate — Decimal(5,2) процентов. DTO содержит строки, вычисления используют decimal/BigInt helpers. Произвольные денежные значения нельзя приводить к JS Number; для графиков допускается ограниченная проекция с точными текстовыми данными рядом.
 
-`/crm/pipeline/page.tsx` передаёт initialData из getDealsByStage и initialNow в DealKanban. Общая навигация CRM содержит Contacts, Pipeline и прежний Document Deals; существующие данные не копируются. Query возвращает PipelineDeal: базовый Deal плюс безопасный owner id/name/avatar и одну последнюю связанную Activity (id/subject/type/createdAt). Вложенное чтение Activity явно ограничено workspace. Все даты/Decimal сериализованы; мутации по-прежнему используют базовые audit snapshots.
+Для Invoice сначала округляется каждая `qty × unitPrice` до евроцента (half-up), затем `subtotal = Σ(lineTotal)`, `taxAmount = round(subtotal × taxRate / 100)`, `total = subtotal + taxAmount`. Номер `INV-YYYY-NNNN` выдаёт InvoiceSequence по workspace/году и не переиспользует номер удалённого draft. Workflow: DRAFT → SENT, затем PAID по поступлениям или OVERDUE по due date; отменить в CANCELLED можно только неоплаченный допустимый статус. Частичная оплата сохраняет непогашенный остаток; overdue определяется календарём workspace.
 
-DealKanban использует @dnd-kit/core DndContext, шесть KanbanColumn с SortableContext, DealCard с useSortable и отдельный DragOverlay без повторной регистрации draggable. Колонка остаётся droppable даже без карточек. Drop меняет этап; порядок внутри этапа задаёт updatedAt desc/id asc, ручной порядок не сохраняется. Пагинация независима для каждой колонки, по 20 сделок, чтобы не скрывать данные за ограниченной начальной выборкой. Успешный перенос перечитывает первые страницы для согласованных counts и показа свежей сделки в начале этапа.
+Finance Dashboard и главный Dashboard считают Revenue по поступлениям, Paid MTD — по receivedAt. **P&L имеет другую базу:** полные суммы счетов с налогом, полностью погашенных на asOf, по дате последнего учтённого платежа; частичные оплаты исключены. Expenses отбираются по Expense.date; Net Profit = Revenue − Expenses. Оба плеча P&L читаются одним SQL statement. Это управленческий отчёт, не бухгалтерский ledger или accrual accounting. Источники: [calculations.ts](../src/modules/finance/calculations.ts), [reports.ts](../src/modules/finance/reports.ts), [Finance docs](modules/finance.md).
 
-PointerSensor поддерживает мышь/касание с handle touch-action:none; KeyboardSensor выбирает соседние колонки стрелками, включая пустые. Есть native stage select, aria-live и локализованные DnD announcements. Drop вне видимой области доски/Escape не выполняет мутацию. Авторизация на клиенте ограничивает affordances, updateDealStage заново проверяет серверную сессию, workspace, версию и audit.
+Существующие RUB-записи переведены одноразовой миграцией `20261020000200` по согласованному курсу 1 EUR = 93 RUB с округлением и пересчётом invoice aggregates. Исторические audit snapshots/неизменяемые stock ledger entries не переписываются. Общий formatter способен форматировать ISO currency, но runtime бизнес-схемы не дают мультивалютность или FX-конвертацию. Legacy DocumentPayment имеет Int-лимиты; это не формат новых нормализованных Payment.
 
-Перенос немедленно обновляет карточку/счётчики и вызывает updateDealStage(id,version,stage). Только одна операция in flight: snapshot rollback не может затереть другое локальное сохранение. Ошибка Result откатывает весь snapshot; неизвестный результат сети требует обновления. После подтверждённого commit ошибки последующего чтения не откатывают сохранённый этап. До успешного обновления дальнейшие записи блокируются. UI показывает pending/error/retry/empty и route skeleton. Вероятности NEW/QUALIFIED/PROPOSAL/NEGOTIATION/WON/LOST = 10/25/50/75/100/0%; это явная стадийная оценка, не новое поле БД и не индивидуальный прогноз.
+### Inventory
 
-## CRM Contact Detail — TASK-009
+Остаток товара — сумма StockItem по складам. `in_stock`: qty > minStock; `low_stock`: 0 < qty ≤ minStock; `out_of_stock`: qty = 0. Sidebar считает low + zero, low-stock banner — именно low. KPI каталога использует активные товары. Стоимость — количество × цена продукта, не FIFO/средневзвешенная оценка.
 
-`/crm/contacts/[id]` — отдельная Server Component страница с initial ContactDetail, timeline и связанной страницей сделок. Контакт проверяется по workspace/id до чтения дочерних записей. Timeline включает Activity с contactId контакта и legacy deal-only Activity с contactId=null, если Deal принадлежит контакту; каждый запрос ограничен workspace. Чтения/count выполняются в RepeatableRead; feed имеет фильтр type и bounded pagination. Activity.assignedTo показывается как ответственный, не выдаётся за автора.
+Входные операции IN/OUT/ADJUSTMENT/TRANSFER создают immutable StockMovement. Transfer сохраняет пару TRANSFER_OUT/TRANSFER_IN с общей связью и нулевым итоговым изменением товара. StockItem — транзакционно обновляемый balance cache, версии обоих затронутых складских остатков проверяются. Отрицательные остатки отклоняются; резервы и партии не реализованы. См. [Inventory docs](modules/inventory.md), [TASK-016](TASK-016.md).
 
-Contact получает сохраняемый String[] tags с default []; миграция добавляет поле без удаления данных. Zod ограничивает 20 тегами по 1–32 символа, без дублей без учёта регистра; updateContact сохраняет tags вместе с version increment и audit. Изменения контакта, назначение, tags и stage используют существующий сервис; новые Activity — createActivity. Для detail route добавлен revalidatePath('/crm/contacts/[id]', 'page'). UI использует RHF/Zod и общие primitives; неизвестный результат записи требует refresh, подтверждённая запись не маскируется ошибкой последующего чтения.
+### HR и Projects
 
-## CRM Contact Forms — TASK-010
+Employee.managerId — self-relation с защитой циклов, связь с User опциональна. EmployeeDocumentLink — именованные ссылки на документы, receipt расходов — ссылка на чек; оба используют HTTP(S), не файловое хранилище. Leave days считаются включительно через date-fns без суббот/воскресений; праздников и half-days нет. Пересечение PENDING/APPROVED одного сотрудника запрещено. Годовой allowance задаётся вручную; отсутствие означает «не задан», 0 — явный лимит. Balance = allowance − APPROVED ANNUAL weekdays в границах года, включая будущие дни; PENDING отдельно. Нет accrual/carryover и блокировки согласования по отрицательному balance. См. [HR docs](modules/hr.md).
 
-ContactFormSheet переиспользуется для создания/редактирования из таблицы и редактирования из detail. Основан на shared Sheet/Radix с modal=false: без overlay, блокировки scroll, aria-hidden фона и focus trap. Взаимодействие с таблицей не закрывает панель и сохраняет draft; параллельные bulk/вторая форма недоступны. На узком экране панель занимает всю ширину, поля прокручиваются отдельно от footer. Shared Sheet получил только необязательный closeDisabled; обычные modal Sheet/sidebar сохраняют прежнее поведение.
+Projects Kanban: TODO/IN_PROGRESS/IN_REVIEW/DONE; исторический CANCELLED доступен в List. DONE устанавливает completedAt, повторное открытие очищает его. Progress = DONE / все задачи проекта, включая CANCELLED. Budget usage = сумма связанных Expense в EUR за всё время; Invoice revenue не является расходом. Team = distinct manager + task assignees, не список всех участников workspace. Timeline — CSS Grid с ограниченным диапазоном 1–93 дня, без Gantt-библиотеки. См. [Projects docs](modules/projects.md).
 
-ContactFormSchema — pick общих контактных полей плюс stage из contactSchema. RHF mode/reValidateMode=onBlur показывают inline ошибки до submit; финальный submit также проверяет всю форму. Cmd/Ctrl+Enter действует внутри формы, Escape закрывает, пока запрос не выполняется. Фокус при открытии — имя, при закрытии — opener. Sonner toast.success подтверждает commit, toast.error сообщает invalid/result/network error. Snapshot id/version при открытии не заменяется свежей версией из фонового чтения: конфликт не превращается в тихое перезаписывание. Unknown result блокирует повтор до закрытия/refresh, без автоповтора создания.
+## 5. Конфигурация, локализация и чтение данных
 
-### Inventory overview — TASK-017
+Settings — singleton **на workspace**, не одна строка на всё приложение. При отсутствии строки `getAppConfiguration` возвращает валидные defaults с version 0 без записи. Ошибка PostgreSQL/невалидная конфигурация возвращает STORAGE. Save ADMIN+ атомарно меняет Settings, Workspace.name и audit с expected version. React.cache объединяет чтения в рамках server request; tenant configuration не помещается в общий изменяемый process cache.
 
-`/inventory/dashboard`: глобальные KPI активных Product и таблица пополнения. Повторно используется tenant-scoped SQL CTE каталога/alert; KPI и список загружаются параллельно. Сумма stock × salePrice округляется по SKU до копеек и возвращается точными строками отдельно по каждой валюте. Low count исключает нули, out count включает нули, список содержит оба статуса. Поиск/статус/страницы не ограничивают KPI. Изменений схемы нет; shared InventoryNavigation связывает overview, каталог и склады.
+ConfigurationProvider передаёт подтверждённый snapshot клиенту. `useAppFormat`, `configuredDate/configuredTimestamp` применяют IANA timezone и date format компании. DATE остаётся календарной датой; timestamp переводится в выбранную timezone. Новый workspace по умолчанию использует Europe/Moscow, но рабочие периоды Finance/HR/Dashboard/overview учитывают Settings. **Известное исключение:** Task dueDate пока преобразуется task-service в конец дня `+03:00`; смена timezone не меняет этот алгоритм.
 
+Logo — inline PNG с проверкой signature, размером до 256 KB и стороной до 1024 px; сервер не загружает произвольный logo URL. Currency фиксирована EUR. Notification flags created/updated/deleted/payment управляют in-app панелью и не отключают audit, HR pending или stock badges. Источники: [config-queries](../src/modules/settings/config-queries.ts), [config-service](../src/modules/settings/config-service.ts), [ConfigurationProvider](../src/modules/settings/configuration-provider.tsx), [Settings docs](modules/settings.md).
 
-## Localization — English / Русский
+next-intl: English по умолчанию, русский через Settings; locale хранится в cookie `evo_locale`, без URL-prefix. Неизвестная cookie → en. Каталоги локализуют интерфейс, server errors, статусы, PDF/CSV; enum и пользовательские тексты в БД не переводятся. Интерполяция не превращает имена/notes в ключи перевода. См. [LOCALIZATION.md](LOCALIZATION.md), [src/i18n](../src/i18n).
 
-UI использует next-intl без языковых префиксов URL. `src/i18n/request.ts` читает проверенную cookie `evo_locale`; по умолчанию `en`, поддерживается `ru`. `useI18n`/`getI18n` связывают каталог с конкретным запросом, без глобального изменяемого языка. Settings сохраняет личный выбор браузера через авторизованный Server Action и перезагружает интерфейс целиком.
+Главный Dashboard читает пять независимых источников через Promise.all после live session и валидации currency; configuration получают использующие её queries. Route force-dynamic/no-store предотвращает повторное использование чужого snapshot; это не единая DB-транзакция. Каждый источник показывает ошибку вместо ложного нуля, ошибка auth закрывает страницу. Projects использует RepeatableRead там, где список/агрегаты должны совпасть; HR profile запускает независимые чтения параллельно без обещания общего snapshot. См. [root page](../src/app/(dashboard)/page.tsx), [Dashboard docs](modules/dashboard.md).
 
-Каталоги `src/i18n/en.json` и `ru.json` содержат системные подписи и сообщения. Интерполяции передаются отдельно через tagged templates, пользовательские поля не переводятся. Enum/status/ключи БД сохраняются. Ошибки Result локализуются на Server Action/API границе; успешные бизнес-данные не изменяются. Форматтеры дат, валют, количеств, графиков и PDF принимают locale явно. CSV переводит заголовки и системные значения, сохраняя точные числовые ячейки. Подробнее: [LOCALIZATION.md](LOCALIZATION.md).
+Cmd+K открывает lazy-loaded cmdk palette, Cmd+N использует контекстный зарегистрированный NewRecordAction, Esc закрывает Sheet/Dialog. Palette ищет маршруты/действия и ограниченный legacy snapshot, не все нормализованные таблицы. URL `create=1` обрабатывается однократно с сохранением остальных filters/hash; используются существующие формы. Loading/error/empty states, mobile и reduced-motion проверены в [TASK-026](TASK-026.md).
 
-Завершение EN/RU: системные заголовки audit переводятся только при подтверждённом entityType (Leave/LeaveAllowance/StockMovement), пользовательские title не переводятся. AuditEvent UI payload передаёт необязательный entityType; БД и audit snapshots не изменяются. Общие formatDateOnly/formatDecimal/formatUnit задают отображение без потери точности и изменения хранимых значений.
+## 6. Процедура добавления нового модуля
 
+1. **Определить контракт.** Описать сущности, workflow, деньги/даты, связи, права и границы в `docs/modules/<domain>.md`. Сверить [INSTRUCTIONS](../INSTRUCTIONS.md), shared types/primitives/hooks и актуальные ADR. Выбрать нормализованные модели; использовать legacy Document только для осознанной совместимости.
+2. **Добавить схему и миграцию.** Для tenant-сущностей — workspaceId, составные unique/FK, Membership для actor/owner, version/createdAt/updatedAt где применимо и индексы под workspace/filter/order. В SQL migration добавить необходимые CHECK/trigger, не ограничиваться Prisma validate. Не применять миграции к произвольной удалённой БД автоматически.
+3. **Создать границу модуля.** Ввести `types.ts` (wire DTO), `schema.ts` (Zod), `access.ts`, `queries.ts`, `service.ts`, `actions.ts`, `components/`. Серверные файлы пометить server-only, actions — use server. Дополнительные файлы выделять по сценарию, как Projects task/overview. У публичных функций — JSDoc, у UI handlers — handleXxx.
+4. **Настроить авторизацию.** Получать workspaceId/userId/role только из live session. Не считать новый Domain автоматически разрешённым. Тип `Domain` сейчас связан с `Record<Domain,...>` legacy registries: если расширять его, проверить `lib/modules.ts`, schemas/document-service/repository, permissions и audit presentation. Не создавать фиктивный RecordData ради компиляции: либо реализовать legacy adapter осознанно, либо выделить отдельный нормализованный access contract (Settings уже имеет собственный). Actor/related ID проверять в том же tenant.
+5. **Реализовать запросы.** Whitelist фильтров/сортировки, безопасные параметры SQL, server pagination/лимиты, сериализация Date/Decimal. Независимые чтения — Promise.all; согласованный набор — statement/транзакционный snapshot. Не кэшировать tenant result глобально; явно определить поведение ошибки и empty state.
+6. **Реализовать мутации.** Проверить input/id/version/workflow/ссылки до записи, выполнить write + version increment + audit в одной транзакции. Для зависимости от конкурентного состояния выбрать подходящий isolation и retry только гарантированно откатившейся операции. Не возвращать Result-ошибку после частичной записи в надежде на rollback; не повторять внешние side effects внутри retry callback. Определить delete protection и идемпотентность отдельно.
+7. **Подключить UI.** Начальные данные в Server Component, client islands для интерактивности. Переиспользовать UI, TanStack и DnD-hook; кнопки согласовать с серверным RBAC. Добавить en/ru сообщения, company formatters, entrance/reduced-motion, доступность, mobile, loading/error/empty states и обработку conflict/network error.
+8. **Зарегистрировать навигацию и интеграции.** Добавить маршруты, Sidebar/Header/command palette и NewRecordAction при наличии create. Проверить [workspace-commands](../src/components/layout/workspace-commands.ts), [new-record-provider](../src/components/layout/new-record-provider.tsx) и legacy metadata registry отдельно. Для audit добавить безопасные title/entity links/domain mapping; проверить notification summaries. Интеграцию KPI подключать явно, не читать legacy документы вместо новых моделей.
+9. **Проверить и документировать.** В обычной задаче — build и визуальная проверка изменённого UI; typecheck/Prisma validate по области. Новые тестовые файлы создаются только в CHECKPOINT. Проверить tenant/RBAC, stale version, rollback audit, обе локали/темы/mobile; на checkpoint использовать изолированную реальную PostgreSQL. Обновить этот документ, доменные docs/roadmap/verification; конфликты законов фиксировать в contradictions.md. Commit/push — по разрешению и правилам текущей задачи.
 
-## Workspace administration — TASK-024
+## 7. Эксплуатация и границы реализации
 
-`settings/actions → queries/service → access → Prisma Membership/WorkspaceInvitation/AuditLog`. `/settings/users` и `/settings/audit` доступны ADMIN/SUPER_ADMIN; Preferences остаётся всем авторизованным. Чтения tenant-scoped, список 20 записей/страницу, аудит — последние 100 событий. Любые роли проверяются заново на сервере; актор повторно проверяется внутри Serializable-транзакции.
+Docker: build → standalone app, отдельный tools stage для Prisma, non-root production process; PostgreSQL 16 health → migration job → app. Sample seed запускается явно через profile, не при каждом старте. Локальные данные/env/secrets исключены из build context; секреты поступают в runtime через environment, Dockerfile не задаёт AUTH_SECRET. `/login` — liveness приложения; `/api/health` проверяет БД с авторизацией. Новый PG16 volume не выполняет downgrade старого PG17 volume. Команды и подтверждённые проверки — [TASK-027](TASK-027.md), настройки — [.env.example](../.env.example).
 
-У Membership есть optimistic version и workspace-specific lastLoginAt. Самостоятельное изменение своей роли/доступа запрещено; ADMIN не управляет SUPER_ADMIN; последнее активное администрирование сохраняется. Деактивация меняет только Membership, сохраняет глобального User и историю, отзывает сессии только этого workspace. Изменение роли тоже отзывает эти сессии. lastLoginAt — telemetry успешного входа, обновляется атомарно с регистрацией сессии без изменения бизнес-version; прежние сессии дают backfill, остальные неизвестны.
+`prisma/seed.ts` поддерживает изолированный Faker sample и bootstrap только администратора. Sample: admin, 20 contacts, 10 deals, 5 invoices, 15 products, 3 warehouses, 8 employees, 3 projects с tasks; advisory lock/transaction/marker делают повторный запуск no-op, сохраняющий пользовательские изменения. Конфликт email не захватывает чужой аккаунт. Production bootstrap требует явных данных администратора; Vercel build не создаёт sample. Demo-store разрешён только отдельным opt-in и никогда не заменяет отказ PostgreSQL. См. [seed.ts](../prisma/seed.ts), [TASK-027](TASK-027.md).
 
-Приглашение: email+роль, случайный 256-bit token, в БД только SHA-256, срок 7 дней, одноразовое принятие/отзыв/version. Копируемая ссылка показывается один раз; отправки email нет. Создание нового аккаунта требует имени и пароля ≥12 символов; существующий аккаунт подтверждает действующий пароль, его профиль не перезаписывается. Членство не восстанавливается через приглашение. При принятии повторно проверяются права создателя. Accepted token может указать workspace для входа только совместно с верным паролем, совпадающим email и активным членством. Обычный вход выбирает последнее использованное членство. Полный workspace switch остаётся будущей задачей.
+Vercel production build применяет миграции перед Next build; Preview не мигрирует и не seed-ит общую БД. Это политика текущего [vercel-build.mjs](../scripts/vercel-build.mjs), а не гарантия изолированных БД окружений или zero-downtime migrations. Детали — [DEPLOYMENT.md](DEPLOYMENT.md).
 
-Изменение Membership/приглашения и аудит выполняются атомарно; токены, хеши и пароли не входят в audit snapshots и клиентские списки. Viewer дополнительно удаляет секретные ключи и ограничивает размер снимков. Домен settings включён в Activity Feed. Подробнее: [modules/settings.md](modules/settings.md).
-
-## EUR — базовая валюта
-
-Все новые денежные документы/цены/бюджеты — EUR, суммы хранятся целыми евроцентами. Существующие RUB переводятся миграцией `20261020000200_eur_base_currency` по явно заданному пользователем курсу **1 EUR = 93 RUB**, с округлением half-up до цента. Сначала округляются цены единиц InvoiceItem, затем пересчитываются строки/subtotal/tax/total; итог может отличаться от округлённого прямого деления старого total. Последнее поступление полностью оплаченного счёта согласуется с новым итогом, переплата конвертируется отдельно. Частичная оплата не превращается в полную. Непредставимые положительные суммы/иные валюты останавливают миграцию целиком. Каждая изменённая финансовая запись получает before/after audit и version increment; исторические audit snapshots и immutable StockMovement сохраняются. Повторное применение исключает Prisma migration history.
-
-Legacy Document/Payment имели неявную RUB и также переводятся. Явный файловый demo получает marker baseCurrency=EUR; старый файл конвертируется при первом чтении и атомарно сохраняется. PostgreSQL не заменяется demo при ошибке. Форматтеры, PDF, CSV, KPI, формы и demo показывают евро независимо от языка.
-
-
-## App Configuration — TASK-025
-
-`Settings.workspaceId` — PK/FK: один singleton на tenant, не один общий на все компании. Миграция backfill сохраняет существующие Workspace.name и создаёт audit bootstrap. Новые workspace до первого сохранения получают документированные defaults (version=0); чтение не пишет в БД. PostgreSQL failure возвращает STORAGE, без demo/default fallback. Явный demo — read-only.
-
-Все участники читают безопасную конфигурацию; ADMIN+ сохраняет через строгую Zod schema, expected version и повторную проверку актора внутри Serializable transaction. Settings, Workspace.name и AuditLog меняются атомарно. На конфликт/неизвестный ответ нужен reload; пользовательский draft не заменяется фоновым обновлением. EUR фиксирована предыдущим требованием пользователя, другие валюты запрещены. Logo хранится bounded inline PNG (≤256 KB, ≤1024²), без внешней загрузки URL; audit сохраняет только logoConfigured.
-
-Dashboard layout параллельно читает configuration и остальные данные и передаёт serializable snapshot в глобальный ConfigurationProvider. Context обновляется после подтверждённого сохранения; layout revalidation распространяет изменения при навигации. React.cache ограничивает повторные DB reads одним запросом, без глобального mutable tenant state. Sidebar/диалог компании используют companyName/logo; PDF использует logo и date format. Исторический issuerName счёта остаётся snapshot, новые счета используют актуальное имя Workspace.
-
-Общий useAppFormat/configuredDate/configuredTimestamp даёт формат дат и IANA timezone в модулях, статусах входа, движениях, audit и PDF. DATE YYYY-MM-DD остаётся календарной датой; timezone применяется к instant timestamps. Task dueDate сохраняет прежнюю календарную семантику. Finance overdue/day/month/MTD и P&L применяют workspace timezone; CSV указывает фактический пояс. Валидация timezone сверяет Intl и PostgreSQL pg_timezone_names.
-
-Переключатели created/updated/deleted/payment управляют панелью in-app notifications и индикатором Header. Audit хранится полностью, operational stock/leave badges сохраняют бизнес-смысл. В Events добавлен settings domain. Email/push transport не заявляется и не имитируется.
-
-
-## TASK-026 — Route feedback and workspace commands
-
-Every UI page has a loading.tsx boundary; shared table/detail/dashboard/form/board skeletons keep narrow screens within the viewport. Root loading also covers asynchronous dashboard layout reads. Root and auth/dashboard group error.tsx files share a client RouteError with retry/refresh and an opaque digest; raw exceptions are never rendered. Expected Result failures continue through ErrorPanel and never become empty lists.
-
-AppShell owns one global Cmd/Ctrl+K and Cmd/Ctrl+N listener. CommandPalette is a separate dynamic chunk, mounted on first use; it reuses the installed cmdk/Shadcn primitives. It searches pages, role-aware create actions and the existing Document registry. Document matching scans the existing tenant snapshot and mounts at most eight results only after a query is entered. Normalized entity search is not claimed. Legacy document links preserve their actual /documents routes. Radix owns Escape/focus trapping, and command execution follows dialog closure to avoid overlapping traps.
-
-NewRecordProvider/useNewRecordAction register the current route's existing create form and eligibility (role, busy state, open dialogs, active product). A shared create=1 navigation intent opens that same form once and removes only that parameter, preserving filters and hashes. Cmd/Ctrl+N ignores typing, IME/repeat and open forms; overview/detail routes without their own action use their module's primary create workflow. Dashboard/settings without a create workflow open the palette. UI affordances do not replace server RBAC.
-
-The existing Sidebar Sheet breakpoint remains strictly below 768px. Escape and navigation restore focus and close the mobile layer; palette opening closes the sidebar first. EmptyState has one token-based illustration and optional contextual action. Dialog/confirmation entrance effects use opacity to preserve positioning and DnD transforms; existing reduced-motion overrides apply to all entrance and skeleton animation.
-
-
-## TASK-027 — Sample initialization and containers
-
-prisma/seed.ts dispatches SEED_MODE=sample (default) or bootstrap. Production Vercel bootstrap forces bootstrap mode and retains SEED_ONLY_IF_EMPTY. The sample initializer uses Faker 10.6.0, a fixed RNG seed and an optional UTC reference date; it creates the normalized model graph inside one advisory-locked transaction in workspace evo-sample-v1. A completion audit marker makes reruns no-ops, preserving later edits and deletions. Existing sample identifiers without a marker or an email owned by another account stop initialization without changing passwords/roles/memberships. No reset/delete or storage fallback is performed.
-
-Invoice totals use the shared exact calculator and generateId/yearly sequences; PAID is backed by actual receipts. Stock balances have immutable opening IN entries. Creation snapshots and the completion marker commit atomically; no credentials enter audit. Supporting expenses/leave records make dashboards and project budget usage inspectable. Sample credentials are explicit development fixtures; bootstrap retains its >=12-character password requirement.
-
-Docker uses Node 24 Debian slim multi-stage targets: dependencies, tools, build, app. Only Docker builds enable Next standalone output; runtime receives public/static/PDF assets, runs as node, and accepts secrets at runtime. .dockerignore excludes env, local data, dependencies and Git. A one-shot tools service runs migrations after postgres:16-alpine is healthy; app starts only after success. An explicit profile tools seed job shares that tooling image. It is not part of ordinary application startup. The new erp_postgres16 volume never reuses the former PostgreSQL 17 directory. Published ports bind localhost; container DATABASE_URL uses the internal postgres hostname.
+Остаются явные ограничения: legacy DocType coexistence; Finance/Projects helper coupling; отсутствие field-level HR ACL, email transport, полноценного workspace switch, login rate limiting/MFA/reset; документы-ссылки без file storage; нет бухгалтерских проводок/refunds/FX, резервов/партий, автоматического leave accrual; нет универсального outbox, workflow engine и idempotency API. Архитектура не объявляет эти возможности реализованными. Согласования требований собраны в [журнале противоречий](contradictions.md). Финальный Developer Guide и техническая приёмка описаны в [TASK-030](TASK-030.md) и [CHECKPOINT-05](CHECKPOINT-05.md).

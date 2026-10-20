@@ -202,3 +202,27 @@ Host production build, tsc --noEmit, prisma validate, Docker app/tools build и 
 Rollback поздней ошибки, отказ при занятом email, сохранение стороннего READONLY и полный no-op при повторном seed/bootstrap (SHA-256 снимка): PASS. Вход admin@erp.dev / Admin123!, authenticated health mode=postgresql, шесть модульных страниц, Docker PDF 200/%PDF- и отсутствие неожиданных browser pageerror: PASS. 375 px HR: 8 cards, без page overflow. Runtime uid=1000/NODE_ENV=production, assets присутствуют, env/local data/Faker отсутствуют.
 
 Тестовый sentinel удалён; существующая локальная PG17 и внешняя production DB не затронуты. Verification sample volume сохранён, сервисы остановлены. Подробности и screenshots: [TASK-027.md](TASK-027.md). Новых test-файлов вне CHECKPOINT нет; это не закрытие CHECKPOINT-05.
+
+
+## TASK-028 — 2026-10-20
+
+Финальная [architecture.md](architecture.md) сверена с текущими schema, module imports, access/service/actions, auth, configuration, Docker и seed. Приняты ADR-001—010; добавлены графы слоёв/модулей/главной страницы, базовая и операционная RBAC-матрицы, доменные инварианты и процедура добавления модуля. Устаревшие текущие RUB/USD и фиксированная timezone заменены на EUR/Settings с явным исключением Task.dueDate. Исторические миграции и ограничения legacy не скрыты. Сводка database.md синхронизирована: 27 моделей, 15 enum, EUR.
+
+npm run build, npx tsc --noEmit и git diff --check: PASS. Все 66 локальных ссылок architecture.md существуют; ADR-001—010 уникальны и упорядочены, fenced blocks сбалансированы. Программная сверка графа с импортами @/modules: 12/12 связей; базовой матрицы с permissions.ts: 5/5 ролей. Build сохраняет существующее предупреждение Prisma 6 о package.json#prisma перед будущим переходом на Prisma 7; ошибок сборки нет.
+
+Изменены только Markdown-документы; новые test-файлы не создавались, UI/БД/seed/Docker runtime не изменялись. Проверки интерфейса и PostgreSQL предыдущих задач остаются в соответствующих отчётах, повторная приёмка CHECKPOINT-05 здесь не заявляется. TASK-029/030 остаются в очереди.
+
+
+## TASK-029 — 2026-10-20
+
+[contradictions.md](contradictions.md) приведён к формату «[CONTRA-NNN] Дата | Закон A vs Закон B | Решение | Применено в TASK-NNN». Девять записей содержат согласования действующих требований с источниками и ссылками на фактически выполненные задачи. Дата регистрации отделена от исторической даты реализации; отдельные пользовательские разрешения не приписываются задним числом. Открытых подтверждённых конфликтов не выявлено. Добавлены порядок остановки зависимой работы по закону 10, сохранение номеров и шаблон новой записи. Roadmap и заключение architecture.md синхронизированы.
+
+npm run build (включая lint/проверку типов), git diff --check: PASS. Одноразовая проверка Markdown: CONTRA-001—009 уникальны и последовательны; даты валидны; у каждой записи четыре поля, пара требований и TASK-ссылки; все 25 локальных ссылок существуют. Новые test-файлы не создавались. Изменена только документация; UI/БД и результаты прежних checkpoint не переоцениваются. TASK-030/CHECKPOINT-05 остаются в очереди.
+
+## TASK-030 + CHECKPOINT-05 — 2026-10-20
+
+Полный Developer Guide (15 разделов и все 10 законов), MIT LICENSE, README и итоговые архитектурные документы подготовлены. Шесть TypeScript examples нового модуля сгенерированы во временном проекте с расширенной Prisma-схемой и прошли strict tsc; локальные ссылки проверены. CONTRA-010 фиксирует явное разрешение пользователя на release Git-операции текущего TASK.
+
+Технический CHECKPOINT-05: build, npx tsc --noEmit, prisma validate, prisma db seed (no-op rerun), Compose up/health — PASS. Реальная PostgreSQL 16.15, isolated Docker sample, authenticated health mode=postgresql. TASK-024: invite/revoke/accept, role change, deactivate/reactivate, session revocation, ADMIN last100 audit, прямые READONLY Next-Action getMembers/getAuditLog/updateMember/createInvitation → FORBIDDEN. PDF 200/%PDF-/10105 bytes, P&L CSV 200; desktop modules, RU/dark, 375px без внешнего overflow, Sidebar/Esc/Meta+K/Meta+N/reduced-motion, entrance ancestry у 190 видимых UI nodes — PASS. Console errors/warnings 0. Static: 31 loading siblings, error boundaries, нет console.log/: any/hex components/Inter. Fixture member/invites/audit удалены; sample audit=113 и основной graph сохранён.
+
+Полный отчёт: [CHECKPOINT-05](CHECKPOINT-05.md), [TASK-030](TASK-030.md). Git commit/push/PR/merge/tag выполняются после технической приёмки; удалённое состояние проверяется отдельно. Внешний deployment не проверялся.
