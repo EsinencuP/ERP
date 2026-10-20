@@ -1,19 +1,75 @@
+x-database: &database
+  DATABASE_URL: postgresql://erp:${POSTGRES_PASSWORD:-erp_local_only}@postgres:5432/erp?schema=public
+
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:16-alpine
     restart: unless-stopped
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     environment:
       POSTGRES_USER: erp
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erp_local_only}
       POSTGRES_DB: erp
     volumes:
-      - erp_postgres:/var/lib/postgresql/data
+      # Separate from the former PostgreSQL 17 volume; never downgrade that data directory.
+      - erp_postgres16:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U erp -d erp"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  migrate:
+    image: evo-erp-tools:local
+    build:
+      context: .
+      target: tools
+    environment: *database
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["npm", "run", "db:migrate"]
+    restart: "no"
+
+  app:
+    image: evo-erp-app:local
+    build:
+      context: .
+      target: app
+    environment:
+      <<: *database
+      NODE_ENV: production
+      ERP_DEMO_MODE: "false"
+      AUTH_SECRET: ${AUTH_SECRET:-${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET or AUTH_SECRET in .env}}
+      AUTH_URL: ${AUTH_URL:-${NEXTAUTH_URL:-http://localhost:3000}}
+      AUTH_TRUST_HOST: "true"
+    ports:
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  seed:
+    profiles: ["tools"]
+    image: evo-erp-tools:local
+    build:
+      context: .
+      target: tools
+    environment:
+      <<: *database
+      SEED_MODE: ${SEED_MODE:-sample}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@erp.dev}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-Admin123!}
+      SEED_WORKSPACE_NAME: ${SEED_WORKSPACE_NAME:-Evo Sample Company}
+      SEED_REFERENCE_DATE: ${SEED_REFERENCE_DATE:-}
+      SEED_ONLY_IF_EMPTY: ${SEED_ONLY_IF_EMPTY:-false}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: ["npm", "run", "db:seed"]
+    restart: "no"
+
 volumes:
-  erp_postgres:
+  erp_postgres16:

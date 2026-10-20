@@ -1,3 +1,4 @@
+import { createSampleWorkspace } from "./seed-sample";
 import { PrismaClient } from "@prisma/client";
 import { z } from "zod";
 import { DEFAULT_NOTIFICATIONS } from "../src/modules/settings/config-schema";
@@ -27,4 +28,12 @@ async function createAdmin(): Promise<Result<string>> {
   } catch { return { ok: false, error: { code: "STORAGE", message: "Не удалось создать администратора. Проверьте PostgreSQL и миграции." } }; }
 }
 
-createAdmin().then((result) => { if (result.ok) console.info(result.data); else { console.error(result.error.message); process.exitCode = 1; } }).catch(() => { console.error("Ошибка подготовки администратора"); process.exitCode = 1; }).finally(async () => { await db.$disconnect(); });
+/** Dispatch an explicit initialization mode; production bootstrap never imports sample records. */
+async function handleSeed(): Promise<Result<string>> {
+  const mode = process.env.SEED_MODE ?? "sample";
+  if (mode === "sample") return createSampleWorkspace(db);
+  if (mode === "bootstrap") return createAdmin();
+  return { ok: false, error: { code: "CONFIGURATION", message: "SEED_MODE must be sample or bootstrap" } };
+}
+
+handleSeed().then((result) => { if (result.ok) console.info(result.data); else { console.error(result.error.message); process.exitCode = 1; } }).catch(() => { console.error("Ошибка подготовки администратора"); process.exitCode = 1; }).finally(async () => { await db.$disconnect(); });

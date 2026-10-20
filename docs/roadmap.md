@@ -114,7 +114,7 @@
 - TASK-025: **реализовано** — tenant Settings singleton, компания/PNG logo/EUR/timezone/date format, глобальный Context, работающие notification toggles. [Отчёт](TASK-025.md).
 - CHECKPOINT-04: **пройден** — TASK-018—025, production build/tsc, HR/leave/Projects/Dashboard/Settings/RBAC/audit, 9/9 проверок нового checkpoint; регрессии CRM и Finance/Inventory также 9/9 каждая. [Отчёт](CHECKPOINT-04.md).
 - TASK-026: **реализовано** — loading всех UI-страниц, error границы, empty states, mobile Sheet, cmdk/Cmd+K, контекстный Cmd+N, entrance/reduced motion. Build/tsc и браузерная проверка на PostgreSQL: PASS. [Отчёт](TASK-026.md).
-- TASK-027: итоговый faker seed и Docker app/PostgreSQL 16.
+- TASK-027: **реализовано** — Faker sample seed, безопасный bootstrap/no-op rerun, Docker app + PostgreSQL 16 + migration/seed jobs; build/tsc/validate, Docker up, вход и PDF проверены. [Отчёт](TASK-027.md).
 - TASK-028: финальные ADR-001—010, зависимости, RBAC и guide нового модуля.
 - TASK-029: итоговый журнал CONTRA-NNN.
 - TASK-030: Developer Guide, CHECKPOINT-05, релиз/PR/merge/tag v1.0.0 только после прохождения финального checkpoint. Текущий commit/push не означает завершение релиза.

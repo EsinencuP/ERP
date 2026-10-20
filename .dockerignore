@@ -1,0 +1,12 @@
+node_modules
+.next
+.git
+.env
+.env.*
+.data
+.vercel
+.playwright-mcp
+playwright-artifacts
+docs/screenshots
+*.tsbuildinfo
+npm-debug.log*

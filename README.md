@@ -2,37 +2,47 @@
 
 Локальный модульный ERP-шаблон на Next.js 15, TypeScript, Tailwind CSS, Prisma и PostgreSQL. Английский интерфейс по умолчанию; полный русский перевод включается тумблером Language в Settings. Модули: обзор, CRM, финансы, склад, команда, проекты, настройки и вход.
 
-## Быстрый старт: демонстрация
+## Быстрый старт: Docker + PostgreSQL 16
 
-Нужен Node.js 22+ и npm. Зависимости зафиксированы в `package-lock.json`.
+Нужен Docker Compose. Если `.env` уже существует, сохраните его настройки вместо копирования поверх.
+
+```powershell
+Copy-Item .env.example .env
+node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+Запишите сгенерированный секрет в `NEXTAUTH_SECRET` в `.env` (либо используйте существующий устойчивый `AUTH_SECRET`). Затем:
+
+```powershell
+docker compose up --build -d
+docker compose run --rm seed
+```
+
+Откройте <http://localhost:3000/login>. Образец создаёт отдельный workspace и пользователя **admin@erp.dev / Admin123!**. Состав: 20 контактов, 10 сделок в `/crm/pipeline`, 5 счетов, 15 товаров, 3 склада, 8 сотрудников, 3 проекта с 18 задачами; также платежи, расходы, лимиты/заявки отпусков и начальные движения запасов. Суммы — EUR. Это учебные учётные данные; существующие аккаунты и рабочие пространства не заменяются. Seed запускается явно, приложение не импортирует данные автоматически.
+
+Compose ждёт готовности PostgreSQL и успешных миграций перед app. App работает с `NODE_ENV=production` от непривилегированного пользователя. По умолчанию доступны только локальные `3000` (app) и `5433` (PostgreSQL); `APP_PORT` / `POSTGRES_PORT` позволяют изменить их. При изменении внешнего порта согласуйте `NEXTAUTH_URL`. Пароль PostgreSQL для host-side Prisma задайте также в `DATABASE_URL`; в Compose внутренний URL формируется отдельно. Для паролей URL используйте percent encoding либо безопасный буквенно-цифровой пароль.
+
+Если Docker Engine работает непосредственно внутри WSL, оставьте дистрибутив активным; можно запустить `docker compose up --build` без `-d` в отдельном терминале, а seed выполнить во втором.
+
+Новый volume `erp_postgres16` отделён от прежнего PostgreSQL 17. Старый каталог нельзя подключать к версии 16: перенос выполняется через dump/restore. `docker compose down` сохраняет данные.
+
+## PostgreSQL и локальный Node.js
+
+Нужен Node.js 24 LTS (или совместимый 22.13+) и npm. Зависимости зафиксированы в `package-lock.json`. Можно поднять только базу и выполнять app локально:
 
 ```powershell
 npm ci
-Copy-Item .env.example .env
-npm run dev
-```
-
-Откройте <http://127.0.0.1:3000>. Если `.env` уже существует, сохраните его текущие настройки вместо копирования поверх.
-
-`ERP_DEMO_MODE=true` явно включает общий демодоступ без пароля. Учебные данные создаются при первом чтении и сохраняются атомарно в `.data/demo-workspace.json`. Файл исключён из Git. Данные принадлежат установке приложения, а не браузеру. Этот режим предназначен только для локальной демонстрации, в одном Node.js-процессе. При выключенном деморежиме приложение никогда не подменяет ошибку БД демоданными.
-
-## PostgreSQL
-
-Нужен Docker Compose либо доступный PostgreSQL 17. Локальный Compose слушает только `127.0.0.1:5433`.
-
-```powershell
-docker compose up -d
+docker compose up -d postgres
 npm run db:migrate
-```
-
-В `.env` задайте `ERP_DEMO_MODE=false`, `DATABASE_URL`, `AUTH_SECRET`, `AUTH_URL`, `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` (от 12 символов) и `SEED_WORKSPACE_NAME`. Для пользовательского `POSTGRES_PASSWORD` согласуйте пароль с `DATABASE_URL`.
-
-```powershell
-npm run db:seed
+npx prisma db seed
 npm run dev
 ```
 
-Перезапустите сервер после изменения `.env`. Войдите через `/login` с заданными при инициализации учётными данными. Seed создаёт пустое пространство и администратора; повторный запуск сохраняет существующий пароль и данные. Удалите пароль bootstrap из окружения после инициализации. TASK-004 использует Auth.js v5 Credentials/JWT и проверяет активное членство на каждом запросе. Для внешнего production задайте AUTH_URL с HTTPS и устойчивый случайный AUTH_SECRET (например, через `npx auth secret`); cookie на HTTPS имеет Secure. После перехода со старой версии войдите заново.
+В `.env` нужны `ERP_DEMO_MODE=false`, `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL`. Для чистой рабочей установки задайте **SEED_MODE=bootstrap**, свой `SEED_ADMIN_EMAIL`, `SEED_ADMIN_PASSWORD` (не менее 12 символов) и `SEED_WORKSPACE_NAME`; затем выполните `npm run db:seed`. Этот режим создаёт только администратора и пустое пространство, сохраняя существующие аккаунты/пароли. После первоначальной настройки удалите bootstrap-пароль из окружения.
+
+По умолчанию `SEED_MODE=sample`. Повторный seed не меняет завершённый образец, в том числе последующие правки и удаления. `SEED_REFERENCE_DATE=YYYY-MM-DD` фиксирует календарную опору; без неё даты отсчитываются от текущего дня UTC. Имена и суммы генерирует Faker с фиксированным seed. Детали: [TASK-027](docs/TASK-027.md).
+
+Для отдельной файловой демонстрации можно явно задать `ERP_DEMO_MODE=true`; она хранится в `.data/demo-workspace.json` и предназначена для одного локального Node-процесса. Ошибка PostgreSQL никогда не включает этот режим автоматически. Внешний production использует HTTPS origin и устойчивый секрет; после изменения env перезапустите app.
 
 ## Vercel
 
@@ -68,7 +78,7 @@ Production-проект: `erp`, домен https://erp-xi-pink.vercel.app, GitHu
 | `npm run check:finance-inventory` | CHECKPOINT-03: интеграции на изолированных PostgreSQL/production server |
 | `npm run db:generate` | Генерация Prisma Client |
 | `npm run db:migrate` | Применение сохранённых миграций |
-| `npm run db:seed` | Bootstrap администратора из env |
+| `npm run db:seed` / `npx prisma db seed` | Sample seed; SEED_MODE=bootstrap — только администратор |
 | `npm run db:studio` | Просмотр PostgreSQL через Prisma Studio |
 
 Тестовые файлы не создаются вне явно назначенного CHECKPOINT. CHECKPOINT-03 пройден: сборка, типы, 9/9 HTTP/PostgreSQL интеграций и браузер. Условия запуска — `docs/CHECKPOINT-03.md`; фактические результаты — `docs/verification.md`.

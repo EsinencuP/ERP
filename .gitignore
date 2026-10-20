@@ -9,3 +9,5 @@ playwright-artifacts/
 
 .vercel
 .env*
+
+!.env.example

@@ -14,7 +14,10 @@ function runTool(label, args) {
 async function handleBuild() {
   const production = process.env.VERCEL_ENV === "production";
   if (production) {
-    const missing = ["DATABASE_URL", "AUTH_SECRET", "AUTH_URL"].filter((key) => !process.env[key]);
+    const missing = [];
+    if (!process.env.DATABASE_URL) missing.push("DATABASE_URL");
+    if (!process.env.AUTH_SECRET && !process.env.NEXTAUTH_SECRET) missing.push("AUTH_SECRET/NEXTAUTH_SECRET");
+    if (!process.env.AUTH_URL && !process.env.NEXTAUTH_URL) missing.push("AUTH_URL/NEXTAUTH_URL");
     if (missing.length) return { ok: false, error: { code: "CONFIGURATION", message: `Production: задайте ${missing.join(", ")}` } };
     if (process.env.ERP_DEMO_MODE === "true") return { ok: false, error: { code: "CONFIGURATION", message: "Файловый деморежим несовместим с Vercel. Используйте PostgreSQL и ERP_DEMO_MODE=false" } };
   }
@@ -23,6 +26,7 @@ async function handleBuild() {
     steps.push(["Production migrations", ["node_modules/prisma/build/index.js", "migrate", "deploy"]]);
     if (process.env.SEED_ADMIN_EMAIL || process.env.SEED_ADMIN_PASSWORD) {
       process.env.SEED_ONLY_IF_EMPTY = "true";
+      process.env.SEED_MODE = "bootstrap";
       steps.push(["Administrator bootstrap", ["--import", "tsx", "prisma/seed.ts"]]);
     }
   }

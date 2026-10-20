@@ -12,7 +12,7 @@
     "check:finance-inventory": "node --env-file=.env --test scripts/checkpoint-finance-inventory.test.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "node --env-file=.env --import tsx prisma/seed.ts",
+    "db:seed": "node --env-file-if-exists=.env --import tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "check:hr-projects-settings": "node --env-file=.env --import tsx --test scripts/checkpoint-hr-projects-settings.test.mjs"
   },
@@ -55,6 +55,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@faker-js/faker": "10.6.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
@@ -64,5 +65,8 @@
     "tailwindcss": "^3.4.17",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0"
+  },
+  "prisma": {
+    "seed": "node --env-file-if-exists=.env --import tsx prisma/seed.ts"
   }
 }

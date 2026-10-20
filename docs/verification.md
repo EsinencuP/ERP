@@ -193,3 +193,12 @@ Production build / npx tsc --noEmit / git diff --check: PASS. Loading siblings �
 Browser → production Next → реальная локальная PostgreSQL: Cmd/Ctrl+N на основных списках, palette → form, nested fallback, один product/audit после сохранения, readonly guards, typing/modal suppression, фильтры/hash/create intent, cap8 и поиск 12-го legacy document, верные /documents links, reset search, Escape/focus: PASS. 375 px/767/768, RU/dark и reduced motion: PASS. Искусственный RSC rejection в browser response показал безопасную границу; Try again восстановил страницу. Финальный обычный smoke — без неожиданных pageerror.
 
 Собственные fixtures удалены, исходные 6 invoices/118 conversion audits сохранены; локальные helper-сервисы остановлены. Внешний deployment не проверялся. Подробности и screenshots: [TASK-026.md](TASK-026.md). TASK-027—030/CHECKPOINT-05 остаются в очереди.
+
+
+## TASK-027 — 2026-10-20
+
+Host production build, tsc --noEmit, prisma validate, Docker app/tools build и Compose config/up: PASS. Реальная PostgreSQL 16.15 в отдельном project erp-task027; миграции exit 0, app/postgres healthy. Seed: 1 admin / 20 contacts / 10 deals / 5 invoices / 15 products / 3 warehouses / 8 employees / 3 projects / 18 tasks. Supporting Payment 2, Expense 3, Leave 3, LeaveAllowance 8, StockMovement 12; audit 113. Exact invoice math/payment coverage/ledger/EUR проверены.
+
+Rollback поздней ошибки, отказ при занятом email, сохранение стороннего READONLY и полный no-op при повторном seed/bootstrap (SHA-256 снимка): PASS. Вход admin@erp.dev / Admin123!, authenticated health mode=postgresql, шесть модульных страниц, Docker PDF 200/%PDF- и отсутствие неожиданных browser pageerror: PASS. 375 px HR: 8 cards, без page overflow. Runtime uid=1000/NODE_ENV=production, assets присутствуют, env/local data/Faker отсутствуют.
+
+Тестовый sentinel удалён; существующая локальная PG17 и внешняя production DB не затронуты. Verification sample volume сохранён, сервисы остановлены. Подробности и screenshots: [TASK-027.md](TASK-027.md). Новых test-файлов вне CHECKPOINT нет; это не закрытие CHECKPOINT-05.
