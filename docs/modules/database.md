@@ -1,6 +1,6 @@
 # База данных ERP — TASK-002
 
-Источник схемы: `prisma/schema.prisma`. Провайдер — PostgreSQL, Prisma 6.19.3. Схема содержит 21 модель и 13 Prisma enums: все модели TASK-002, Workspace/Membership и два совместимых legacy-типа.
+Источник схемы: `prisma/schema.prisma`. Провайдер — PostgreSQL, Prisma 6.19.3. После TASK-027 схема содержит 27 моделей и 15 Prisma enums, включая Settings, WorkspaceInvitation, InvoiceSequence, Expense, EmployeeDocumentLink и LeaveAllowance, добавленные после TASK-002. Финальные решения, RBAC и зависимости — в [architecture.md](../architecture.md); разделы TASK ниже описывают историю конкретных миграций.
 
 ## Связи модулей
 
@@ -61,11 +61,11 @@ TASK-004 сохраняет passwordHash/scrypt, переводит cookie на 
 - `InvoiceItem`: обязательный Invoice, nullable Product, позиция, snapshot-описание, quantity, unitPrice, total. Уникальная позиция в счёте. Удаление неоплаченного счёта каскадно удаляет его строки; удаление Product, используемого в строках, ограничено.
 - `Payment`: обязательный Invoice, положительный amount, PaymentMethod, уникальный в workspace reference, receivedAt, nullable receivedBy → Membership. Наличие платежа блокирует физическое удаление счёта через FK Restrict.
 
-Денежные поля используют `Decimal @db.Decimal(20, 0)` и хранят **целые минимальные денежные единицы**, для RUB — копейки. Это сохраняет правило проекта о копейках и выполняет требование Decimal без перехода на Float. Пример: 123,45 ₽ хранится как `12345`. TaxRate — `Decimal(5,2)` в процентах. Quantity — `Decimal(20,3)`, поэтому поддерживаются дробные объёмы.
+Денежные поля используют `Decimal @db.Decimal(20, 0)` и хранят **целые евроценты (EUR)**. Пример: 123,45 € хранится как `12345`. TaxRate — `Decimal(5,2)` в процентах. Quantity — `Decimal(20,3)`, поэтому поддерживаются дробные объёмы. Миграция `20261020000200` перевела существующие RUB-значения по согласованному курсу 1 EUR = 93 RUB; текущие бизнес-схемы и денежные CHECK допускают только EUR.
 
-Арифметика: `InvoiceItem.total = round(quantity × unitPrice, 0)`, `Invoice.total = round(subtotal × (1 + taxRate / 100), 0)`. SQL CHECK защищает эти равенства. Сумму строк, равенство валют, сумму платежей, запрет переплаты и переходы статусов нужно обеспечивать в транзакции доменного сервиса: межстрочные суммы не выражены CHECK-ограничениями. Округление PostgreSQL numeric до копейки — half away from zero; для положительных денег это half-up.
+Арифметика: `InvoiceItem.total = round(quantity × unitPrice, 0)`, `subtotal = Σ(InvoiceItem.total)`, `taxAmount = round(subtotal × taxRate / 100, 0)`, `Invoice.total = subtotal + taxAmount`. SQL CHECK защищает построчные равенства; суммы между строками, равенство валют, сумму платежей, запрет переплаты и переходы статусов обеспечивает доменный сервис в транзакции. Округление PostgreSQL numeric до евроцента — half away from zero; для положительных денег это half-up.
 
-В HTTP/Server Action DTO передавать Decimal строкой (`toFixed(0)` для денег) или явно ограниченным числом копеек. Не преобразовывать произвольный Decimal(20,0) в JS number: диапазон превышает MAX_SAFE_INTEGER. Prisma/SQL не заменяют Zod-проверку precision/scale на входе; numeric-колонки могут округлять лишние дробные разряды.
+В HTTP/Server Action DTO передавать Decimal строкой (`toFixed(0)` для денег); в графики — только явно ограниченную проекцию с точными текстовыми значениями рядом. Не преобразовывать произвольный Decimal(20,0) в JS number: диапазон превышает MAX_SAFE_INTEGER. Prisma/SQL не заменяют Zod-проверку precision/scale на входе; numeric-колонки могут округлять лишние дробные разряды.
 
 ## INVENTORY
 
