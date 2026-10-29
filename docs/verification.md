@@ -229,6 +229,23 @@ npm run build (включая lint/проверку типов), git diff --chec
 
 ## Пользовательское руководство и public sample — 2026-10-20
 
+Этот раздел описывает предыдущую публикацию; локальное обновление визуальной экосистемы от 29.10.2026 приведено в конце документа.
+
 По уточнению пользователя INSTRUCTIONS.md заменён руководством для пользователей, Developer Guide перемещён без потери правил. Host build/tsc, local upgrade/no-op preservation, fresh migration/seed и controlled collision/late rollback прошли. Новые test-файлы не создавались; проверки выполнены одноразовыми CLI/browser сценариями на изолированной PostgreSQL.
 
 В отличие от более раннего checkpoint, здесь проверена опубликованная Vercel ERP: deployment dpl_ByTVBzdTeqo8dyajPiwLYrAaPCKA READY, sample import и guide generation подтверждены cloud logs. Реальный учебный вход, PostgreSQL health, 6 members, 100 audit rows с 12 событиями участников, 5 classic deals, 16 pipeline deals/6 curated cases, Finance 5 invoices, Inventory 15 products и заполненные HR/Projects прошли. User guide доступен анонимно, 375 px без page overflow; console warnings/errors=0. Перед upload проверены явные исключения секретов/локальных данных. Полный отчёт и снимки: [USER_GUIDE_PUBLIC_SAMPLE](USER_GUIDE_PUBLIC_SAMPLE.md).
+
+## Визуальная экосистема портфолио — 2026-10-29
+
+Изменены центральные HSL-токены, радиусы Tailwind, общие Button/Card и типографика заголовков. Референс — пользовательские PNG: точные фоны #F2F0EA / #111614, поверхности #FFFFFF / #1C211F / #252B28, акценты #175449 / #B8D4AD. Верхняя панель #121715 в обеих темах. Geist Sans/Mono сохранены, новых зависимостей и тестовых файлов нет. Переносимая спецификация: [VISUAL_ECOSYSTEM.md](VISUAL_ECOSYSTEM.md).
+
+- Финальный `npm run build` — PASS, production compilation и type validation. `npm run typecheck` — PASS. `git diff --check` — PASS. Первичная попытка сборки при работающем dev server получила Windows EPERM на Prisma DLL; dev server остановлен, две последующие сборки успешны.
+- Для UI использован существующий sample в изолированном Docker PostgreSQL 16, 127.0.0.1:5434, и новый host production server 127.0.0.1:3000. `ERP_DEMO_MODE=false` задан только процессу; .env не менялся. Ни seed, ни миграции, ни бизнес-записи не создавались. Вход штатной формой admin@erp.dev; authenticated health HTTP 200 / ready / mode=postgresql.
+- Desktop 1440×1000: Dashboard, CRM contacts/pipeline, Finance invoices/dashboard, Inventory, HR, Projects Kanban/overview и Settings. Проверены обе палитры на ключевых экранах; внешнего page overflow и UI alerts с ошибками нет. Снимки реального UI: [light](screenshots/visual-ecosystem-light.png), [dark](screenshots/visual-ecosystem-dark.png).
+- Mobile 375×812: Dashboard, contacts, tasks, overview, Settings в обеих темах; scrollWidth=375 во всех случаях. Мобильный Sidebar шириной 288px имеет правильную поверхность каждой темы, открывается штатной кнопкой и закрывается Esc.
+- Форма нового контакта в обеих темах: правильные поверхности, контраст основной кнопки, автофокус имени, видимая акцентная граница поля; Esc закрывает форму. Форма не отправлялась. Выбор темы сохраняется после навигации/полной перезагрузки, erp-theme=dark подтверждён. Reduced motion: animation-duration=0.00001s.
+- Расчёт WCAG по sRGB: CTA текст 8.75:1 light / 11.37:1 dark, вторичный текст на карточке 5.82:1 / 8.33:1, самые светлые подписи на raised 4.54:1 / 5.44:1. Текст четырёх основных статусных пар на soft-фонах ≥4.95:1 light / ≥5.98:1 dark. Границы полей относительно фона 3.29:1 / 3.76:1. Это проверка перечисленных токен-пар, а не сертификация всего интерфейса.
+- Authenticated PDF существующего счёта: HTTP 200, application/pdf, %PDF-, 9907 байт; палитра PDF читается из обновлённых light tokens. User guide пересоздан штатным prebuild. Browser console: 0 errors / 0 warnings в проверенном production-потоке.
+- React-проверка изменений Button/Card: существующие forwardRef, Slot, типы и семантические варианты сохранены, новые hooks/client boundaries/зависимости не добавлены.
+
+Проверки выполнялись разовыми CLI/browser вызовами; новых тестовых файлов вне CHECKPOINT нет. Результаты относятся к локальной production-сборке; Git-публикация и состояние внешнего deployment подтверждаются отдельно.

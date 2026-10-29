@@ -155,6 +155,8 @@ Finance/Inventory/HR/Projects используют Serializable wrappers с ма
 
 **Решение.** Переиспользуемые primitives находятся в `src/components/ui`; Radix управляет focus/keyboard у соответствующих Dialog/Sheet. Семантические Tailwind-классы ссылаются на HSL CSS variables из globals.css. Палитра не задаётся внутри компонентов. Тема `.dark` управляется общим ThemeProvider. Шрифты Geist Sans/Mono; Sonner — общие уведомления. Entrance animations и prefers-reduced-motion задаются общими motion-правилами.
 
+**Визуальная экосистема, 29.10.2026.** Палитра согласована с пользовательскими референсами Workspace: молочный фон и глубокий зелёный акцент в светлой теме; зелёно-графитовые поверхности и шалфейный акцент в тёмной. Верхняя панель использует отдельные chrome-токены и остаётся тёмной в обеих темах. Общие радиусы уменьшены, карточки плоские, Geist сохранён; данные и бизнес-логика не меняются. Переносимая спецификация и задание для других проектов: [VISUAL_ECOSYSTEM.md](VISUAL_ECOSYSTEM.md).
+
 **Альтернативы.** Цвета и виджеты по отдельности в модулях расходятся при смене темы; полная UI-библиотека навязала бы другой визуальный контракт.
 
 **Последствия.** Новый UI использует существующие Button/Table/Sheet/EmptyState и токены. Ни hex, ни прямые цветовые Tailwind utilities не подменяют tokens. Sidebar становится Sheet при ширине <768px; таблицы/Kanban прокручиваются внутри области. `loading.tsx`, error boundaries и информативные empty states — часть маршрута. Источники: [globals.css](../src/app/globals.css), [UI](../src/components/ui), [TASK-026](TASK-026.md).

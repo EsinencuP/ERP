@@ -18,7 +18,7 @@ export default {
         chart: { "1": color("chart-1"), "2": color("chart-2"), "3": color("chart-3"), "4": color("chart-4"), "5": color("chart-5") },
         sidebar: { DEFAULT: color("sidebar-background"), foreground: color("sidebar-foreground"), primary: color("sidebar-primary"), "primary-foreground": color("sidebar-primary-foreground"), accent: color("sidebar-accent"), "accent-foreground": color("sidebar-accent-foreground"), border: color("sidebar-border"), ring: color("sidebar-ring") },
       },
-      borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" },
+      borderRadius: { DEFAULT: "var(--radius)", sm: "calc(var(--radius) - 2px)", md: "var(--radius)", lg: "var(--radius)", xl: "calc(var(--radius) + 2px)", "2xl": "calc(var(--radius) + 4px)", "3xl": "calc(var(--radius) + 8px)" },
       boxShadow: {
         sm: "0 1px 2px hsl(var(--color-shadow))",
         DEFAULT: "0 1px 4px hsl(var(--color-shadow))",

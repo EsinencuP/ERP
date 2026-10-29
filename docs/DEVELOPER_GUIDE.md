@@ -402,7 +402,7 @@ Handle Result.ok and VALIDATION/UNAUTHORIZED/FORBIDDEN/NOT_FOUND/CONFLICT/STORAG
 
 - **Company/formatting:** Settings controls name/logo/timezone/date format/notification flags. Logo is validated inline PNG ≤256 KB and ≤1024 × 1024; no arbitrary URL fetch. Use ConfigurationProvider/useAppFormat in clients and configuredDate/configuredTimestamp on servers. DATE remains calendar-only; timestamps use workspace timezone. Defaults never hide storage errors.
 - **Language:** add matching en/ru catalog entries in src/i18n and preserve placeholders. Translate labels/errors/PDF/CSV; do not translate persisted enums or user text. Cookie evo_locale stores language; invalid values fall back to en.
-- **Theme:** edit central HSL tokens and semantic mappings; reuse ThemeProvider/UI/reduced-motion. Check both themes, keyboard focus, disabled states and 375 px.
+- **Theme:** edit central HSL tokens and semantic mappings; reuse ThemeProvider/UI/reduced-motion. The shared portfolio palette, typography, radii and migration brief are defined in [VISUAL_ECOSYSTEM.md](VISUAL_ECOSYSTEM.md). Header chrome remains dark in both themes using its own tokens. Check both themes, keyboard focus, disabled states and 375 px.
 - **Forms/tables/boards:** reuse RHF/Zod sheets, TanStack pagination and shared DnD. Save through versioned Server Actions with visible network/conflict errors.
 - **Permissions:** change canonical permissions and server guards together, then UI. Unknown roles fail closed; Employee.managerId does not imply an ACL.
 - **Schema/seed/deploy:** add SQL migrations, validate real PostgreSQL, preserve sample isolation/explicit seed and third-party font licenses. Keep secrets and environment databases separate.
